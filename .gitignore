@@ -1,0 +1,9 @@
+# files
+*.md
+requirements.txt
+*.log
+
+
+# environment.env
+venv/
+.env
