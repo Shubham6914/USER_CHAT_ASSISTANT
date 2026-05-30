@@ -25,6 +25,8 @@ def test_connections():
         # -------------------------
         session = db_service.get_postgres_session()
 
+        print(f"Postgres URL: {db_service._build_postgres_url()}")
+
         result = session.execute(text("SELECT 1"))
         value = result.scalar()
 
