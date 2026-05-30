@@ -2,7 +2,8 @@
 *.md
 requirements.txt
 *.log
-
+.pytest_cache/
+__pycache__/
 
 # environment.env
 venv/
