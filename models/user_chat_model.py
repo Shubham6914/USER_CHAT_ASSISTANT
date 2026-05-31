@@ -1,6 +1,9 @@
+import uuid
+
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base
 
@@ -10,8 +13,8 @@ class UserChat(Base):
     Chat model representing a conversation session.
 
     Attributes:
-        chat_id (int): Primary key.
-        user_id (int): Foreign key to User.
+        chat_id (UUID): Primary key.
+        user_id (UUID): Foreign key to User.
         chat_title (str): Title of the chat.
         created_at (datetime): Timestamp of chat creation.
 
@@ -22,8 +25,8 @@ class UserChat(Base):
 
     __tablename__ = "user_chats"
 
-    chat_id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    chat_id = Column(UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4, unique=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
     chat_title = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 

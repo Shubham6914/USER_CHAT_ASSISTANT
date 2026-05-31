@@ -203,3 +203,6 @@ class DatabaseService:
             logger.error(f"Pinecone health check failed: {str(e)}")
 
         return health_status
+    
+
+database_service = DatabaseService()

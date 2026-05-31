@@ -2,7 +2,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
-from app.core.database_service import DatabaseService
+from app.core.database_service import database_service
 from services.user_service import UserService
 from models.user_model import User
 from services.logger_service import get_logger
@@ -19,7 +19,7 @@ def get_db():
     Yields:
         Session: SQLAlchemy database session.
     """
-    db = DatabaseService.get_postgres_session()
+    db = database_service.get_postgres_session()
     try:
         yield db
     finally:

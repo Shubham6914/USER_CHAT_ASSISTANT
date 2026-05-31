@@ -1,17 +1,21 @@
 from fastapi import FastAPI
-
-from app.core.database_service import DatabaseService
+from fastapi.concurrency import asynccontextmanager
+import models
+from app.core.database_service import database_service
 from api.routes import router as auth_router
 from services.logger_service import get_logger
 
 logger = get_logger(__name__)
 
-# -------------------- Initialize Services --------------------
 
-db_service = DatabaseService()
 
-db_service.initialize_postgres_connection()
-db_service.initialize_pinecone_connection()
+# -------------------- Initialize db services --------------------
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    database_service.initialize_postgres_connection()
+    database_service.initialize_pinecone_connection()
+    yield
 
 logger.info("Database connections initialized successfully.")
 
@@ -19,7 +23,8 @@ logger.info("Database connections initialized successfully.")
 
 app = FastAPI(
     title="User Assistant API",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # -------------------- Include Routers --------------------
