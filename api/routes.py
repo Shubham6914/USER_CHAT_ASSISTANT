@@ -1,11 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
 from services.user_service import UserService
-from api.dependencies import get_db, get_current_user
+from api.dependencies import get_db, get_current_user,get_storage_provider
 from models.user_model import User
 from services.logger_service import get_logger
+from services.storage.local_storage import LocalStorage
+from services.document_upload_service import DocumentUploadService
+from schemas.document_schema import DocumentUploadResponse
 
 logger = get_logger(__name__)
 
@@ -34,6 +37,10 @@ class RefreshRequest(BaseModel):
 
 class LogoutRequest(BaseModel):
     refresh_token: str
+
+
+class VerifyAccessTokenRequest(BaseModel):
+    access_token: str
 
 
 
@@ -99,6 +106,26 @@ def refresh_token(request: RefreshRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail=str(e))
     
 
+
+@router.post("/verify-token")
+def verify_access_token(request: VerifyAccessTokenRequest, db: Session = Depends(get_db)):
+    """
+    Verify if access token is valid.
+    """
+    try:
+        is_valid = UserService.verify_access_token(
+            request.access_token
+        )
+
+        return {
+            "is_valid": is_valid
+        }
+
+    except Exception as e:
+        logger.error(f"Token verification failed: {str(e)}")
+        raise HTTPException(status_code=401, detail=str(e))
+    
+
 @router.post("/logout")
 def logout(request: LogoutRequest, db: Session = Depends(get_db)):
     """
@@ -127,3 +154,21 @@ def get_me(current_user: User = Depends(get_current_user)):
         "user_name": current_user.user_name,
         "user_email": current_user.user_email
     }
+
+@router.post("/upload-document", response_model=DocumentUploadResponse)
+def upload_document(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),  # 🔐 AUTH HERE
+    db=Depends(get_db),
+    storage=Depends(get_storage_provider),
+):
+    """
+    Upload document (Authenticated users only)
+    """
+
+    service = DocumentUploadService(
+        db_session=db,
+        storage_provider=storage,
+    )
+
+    return service.upload_document(user_id=current_user.user_id, file=file)

@@ -1,4 +1,5 @@
 import os
+from typing import ClassVar
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
@@ -41,6 +42,17 @@ class Settings(BaseSettings):
 
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 15))
     REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 7))
+
+
+    #-------------------------
+    # document upload config
+    #-------------------------
+    ALLOWED_TYPES: ClassVar[list[str]] = [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ]
+    MAX_FILE_SIZE: int = 5 * 1024 * 1024  # 5MB
+
 
     # -------------------------
     # Validation

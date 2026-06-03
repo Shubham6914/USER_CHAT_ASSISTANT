@@ -6,6 +6,7 @@ from app.core.database_service import database_service
 from services.user_service import UserService
 from models.user_model import User
 from services.logger_service import get_logger
+from services.storage.local_storage import LocalStorage
 
 logger = get_logger(__name__)
 
@@ -52,8 +53,10 @@ def get_current_user(
         token = credentials.credentials
 
         user_id = UserService.verify_access_token(token)
+        print(f"Verified user_id from token: {user_id}")
 
         user = db.query(User).filter(User.user_id == user_id).first()
+        print(f"Fetched user from DB: {user}")
 
         if not user:
             raise HTTPException(
@@ -69,3 +72,14 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token"
         )
+    
+
+def get_storage_provider() -> LocalStorage:
+    """
+    Dependency to get storage provider instance.
+
+    Returns:
+        LocalStorage: Instance of local storage provider
+    """
+    return LocalStorage()
+

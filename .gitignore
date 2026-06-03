@@ -8,3 +8,8 @@ __pycache__/
 # environment.env
 venv/
 .env
+
+
+#  local files
+
+uploads/

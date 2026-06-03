@@ -1,4 +1,5 @@
 from passlib.context import CryptContext
+from uuid import UUID
 from services.logger_service import get_logger
 
 from jose import JWTError, jwt
@@ -62,12 +63,12 @@ class UserService:
             return False
     
     @staticmethod
-    def generate_access_token(user_id: int) -> str:
+    def generate_access_token(user_id: UUID) -> str:
         """
         Generates a JWT access token.
 
         Args:
-            user_id (int): ID of the user.
+            user_id (UUID): ID of the user.
 
         Returns:
             str: Encoded JWT access token.
@@ -91,12 +92,12 @@ class UserService:
             raise
 
     @staticmethod
-    def generate_refresh_token(user_id: int) -> tuple[str, datetime]:
+    def generate_refresh_token(user_id: UUID) -> tuple[str, datetime]:
         """
         Generates a refresh token.
 
         Args:
-            user_id (int): ID of the user.
+            user_id (UUID): ID of the user.
 
         Returns:
             tuple[str, datetime]: Refresh token and expiry datetime.
@@ -120,7 +121,7 @@ class UserService:
             raise
     
     @staticmethod
-    def verify_access_token(token: str) -> int:
+    def verify_access_token(token: str) -> UUID:
         """
         Verifies an access token and extracts user_id.
 
@@ -128,7 +129,7 @@ class UserService:
             token (str): JWT access token.
 
         Returns:
-            int: User ID from token.
+            UUID: User ID from token.
 
         Raises:
             Exception: If token is invalid or expired.
@@ -143,7 +144,8 @@ class UserService:
             if payload.get("type") != "access":
                 raise Exception("Invalid token type")
 
-            user_id = int(payload.get("sub"))
+            user_id = UUID(payload["sub"])
+            print(f"Verified user_id from token: {user_id}")
 
             logger.debug(f"Access token verified for user_id={user_id}")
             return user_id
@@ -156,17 +158,35 @@ class UserService:
     @staticmethod
     def refresh_access_token(db: Session, refresh_token: str) -> str:
         """
-        Generates a new access token using a valid refresh token.
+        Generates a new access token and rotates the refresh token.
+
+        This function implements **refresh token rotation security model**:
+        the old refresh token is invalidated and replaced with a new one.
+
+        Flow:
+            1. Decode and validate JWT refresh token
+            2. Verify token type is "refresh"
+            3. Extract user_id from token
+            4. Validate refresh token exists in database
+            5. Check token expiry
+            6. Delete old refresh token (rotation step)
+            7. Generate new access token
+            8. Generate new refresh token
+            9. Store new refresh token in database
+            10. Return new access token and refresh token
 
         Args:
             db (Session): Database session.
-            refresh_token (str): JWT refresh token.
+            refresh_token (str): JWT refresh token provided by client.
 
         Returns:
-            str: New access token.
+            dict: A dictionary containing:
+                - access_token (str): Newly issued access token
+                - refresh_token (str): Newly issued refresh token
 
         Raises:
-            Exception: If refresh token is invalid, expired, or not found in DB.
+            Exception: If refresh token is invalid, expired, not found in DB,
+                    or fails JWT validation.
         """
         try:
             # decode token
@@ -179,7 +199,7 @@ class UserService:
             if payload.get("type") != "refresh":
                 raise Exception("Invalid token type")
 
-            user_id = int(payload.get("sub"))
+            user_id = UUID(payload["sub"])
 
             # check token exists in DB
             token_entry = db.query(RefreshToken).filter(
@@ -194,12 +214,25 @@ class UserService:
             if token_entry.expires_at < datetime.utcnow():
                 raise Exception("Refresh token expired")
 
-            # generate new access token
+            # 🔥 ROTATE TOKEN (delete old + create new)
+            db.delete(token_entry)
+
             new_access_token = UserService.generate_access_token(user_id)
+            new_refresh_token, new_expiry = UserService.generate_refresh_token(user_id)
 
-            logger.info(f"Access token refreshed for user_id={user_id}")
+            new_entry = RefreshToken(
+                user_id=user_id,
+                refresh_token=new_refresh_token,
+                expires_at=new_expiry
+            )
 
-            return new_access_token
+            db.add(new_entry)
+            db.commit()
+
+            return {
+                "access_token": new_access_token,
+                "refresh_token": new_refresh_token
+            }
 
         except JWTError as e:
             logger.error(f"Refresh token verification failed: {str(e)}")
@@ -257,18 +290,34 @@ class UserService:
     @staticmethod
     def login_user(db: Session, user_email: str, password: str) -> dict:
         """
-        Authenticates user and generates access + refresh tokens.
+        Authenticates a user and creates a new session with access and refresh tokens.
+
+        This function enforces a **single active session per user** by deleting any
+        existing refresh token before issuing new tokens.
+
+        Flow:
+            1. Fetch user by email
+            2. Verify password using bcrypt hash comparison
+            3. Delete any existing refresh token for the user (single-session rule)
+            4. Generate new access token
+            5. Generate new refresh token with expiry
+            6. Store refresh token in database
+            7. Return authentication tokens
 
         Args:
             db (Session): Database session.
-            user_email (str): User email.
-            password (str): Plain text password.
+            user_email (str): Registered email of the user.
+            password (str): Plain text password provided by user.
 
         Returns:
-            dict: Access token and refresh token.
+            dict: A dictionary containing:
+                - access_token (str): JWT access token
+                - refresh_token (str): JWT refresh token
+                - token_type (str): Token type ("bearer")
+                - user_id (UUID): Authenticated user ID
 
         Raises:
-            Exception: If authentication fails.
+            Exception: If user does not exist or password is invalid.
         """
         try:
             # get user
@@ -280,6 +329,11 @@ class UserService:
             # verify password
             if not UserService.verify_password(password, user.password_hash):
                 raise Exception("Invalid email or password")
+            
+             # ✅ delete existing refresh token (single session rule)
+            db.query(RefreshToken).filter(
+                RefreshToken.user_id == user.user_id
+            ).delete()
 
             # generate tokens
             access_token = UserService.generate_access_token(user.user_id)
@@ -312,14 +366,26 @@ class UserService:
     @staticmethod
     def logout_user(db: Session, refresh_token: str) -> None:
         """
-        Logs out a user by removing the refresh token from the database.
+        Logs out a user by invalidating their refresh token.
+
+        This function removes the refresh token from the database, effectively
+        ending the user's session.
+
+        Flow:
+            1. Locate refresh token in database
+            2. If token does not exist, raise exception
+            3. Delete refresh token from database
+            4. Commit transaction
 
         Args:
             db (Session): Database session.
             refresh_token (str): Refresh token to invalidate.
 
+        Returns:
+            None
+
         Raises:
-            Exception: If token not found or DB error occurs.
+            Exception: If refresh token is invalid or not found in database.
         """
         try:
             token_entry = db.query(RefreshToken).filter(
