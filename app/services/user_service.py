@@ -1,6 +1,6 @@
 from passlib.context import CryptContext
 from uuid import UUID
-from services.logger_service import get_logger
+from app.services.logger_service import get_logger
 
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
@@ -9,9 +9,9 @@ from app.core.config import settings
 from sqlalchemy.orm import Session
 
 from datetime import datetime
-from models.user_model import User
+from app.models.user_model import User
 
-from models.refresh_token_model import RefreshToken
+from app.models.refresh_token_model import RefreshToken
 logger = get_logger(__name__)
 
 # bcrypt config

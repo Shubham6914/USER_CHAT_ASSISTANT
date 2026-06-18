@@ -32,3 +32,9 @@ class UserDocument(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="documents")
+    processing_status = relationship(
+    "ProcessingStatus",
+    back_populates="document",
+    uselist=False,  # important for 1:1
+    cascade="all, delete-orphan"
+)

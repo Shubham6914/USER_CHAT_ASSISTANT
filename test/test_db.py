@@ -1,7 +1,7 @@
 from sqlalchemy import text
 
 from app.core.database_service import DatabaseService
-from services.logger_service import get_logger
+from app.services.logger_service import get_logger
 
 logger = get_logger(__name__)
 

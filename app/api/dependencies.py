@@ -3,10 +3,13 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from app.core.database_service import database_service
-from services.user_service import UserService
-from models.user_model import User
-from services.logger_service import get_logger
-from services.storage.local_storage import LocalStorage
+from app.services.user_service import UserService
+from app.models.user_model import User
+
+
+from app.services.logger_service import get_logger
+from app.storage.local_storage import LocalStorage
+
 
 logger = get_logger(__name__)
 
@@ -25,6 +28,16 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def get_pinecone_index():
+    """
+    Provides a Pinecone index instance.
+
+    Returns:
+        Pinecone index instance
+    """
+    return database_service.get_pinecone_index()
 
 
 def get_current_user(

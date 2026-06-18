@@ -2,13 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
-from services.user_service import UserService
-from api.dependencies import get_db, get_current_user,get_storage_provider
-from models.user_model import User
-from services.logger_service import get_logger
-from services.storage.local_storage import LocalStorage
-from services.document_upload_service import DocumentUploadService
-from schemas.document_schema import DocumentUploadResponse
+from app.services.user_service import UserService
+from app.api.dependencies import get_db, get_current_user,get_storage_provider
+from app.models.user_model import User
+from app.services.logger_service import get_logger
+from app.storage.local_storage import LocalStorage
+from app.services.document_upload_service import DocumentUploadService
+from app.schemas.document_schema import DocumentUploadResponse
 
 logger = get_logger(__name__)
 

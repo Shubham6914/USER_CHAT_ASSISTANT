@@ -7,7 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from pinecone import Pinecone, ServerlessSpec
 
 from .config import settings
-from services.logger_service import get_logger
+from app.services.logger_service import get_logger
 logger = get_logger(__name__)
 
 

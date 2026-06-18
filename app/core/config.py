@@ -23,9 +23,9 @@ class Settings(BaseSettings):
     # -------------------------
     # Pinecone
     # -------------------------
-    PINECONE_API_KEY: str
-    PINECONE_INDEX_NAME: str
-    PINECONE_ENVIRONMENT: str
+    PINECONE_API_KEY: str ="pcsk_7NGrZc_FSRqgqgNjhMUQxGyQ9nBzGQ8CEfhe1ocifTuURmDFfNtCs5RNZdVwue8uqm6HUu"
+    PINECONE_INDEX_NAME: str = "text-document"
+    PINECONE_ENVIRONMENT: str ="us-east-1"
 
     # -------------------------
     # App Config
@@ -53,7 +53,25 @@ class Settings(BaseSettings):
     ]
     MAX_FILE_SIZE: int = 5 * 1024 * 1024  # 5MB
 
+    #-------------------------
+    # chunks config
+    #-------------------------
+    chunk_size: int = 800
+    chunk_overlap: int = 120
 
+    # -------------------------
+    # OpenAI       
+    # -------------------------
+    OPENAI_API_KEY: str =""
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
+    EMBEDDING_BATCH_SIZE: int = 50
+
+    #----------------------
+    # redis config
+    #---------------------
+    REDIS_URL: str = "redis://127.0.0.1:6379/0"
+
+    
     # -------------------------
     # Validation
     # -------------------------

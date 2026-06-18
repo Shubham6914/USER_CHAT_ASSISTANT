@@ -3,8 +3,8 @@ import os
 from uuid import UUID
 from fastapi import UploadFile
 import re
-from services.logger_service import get_logger
-from exceptions.document_exceptions import (
+from app.services.logger_service import get_logger
+from app.exceptions.document_exceptions import (
     InvalidFileTypeException,
     FileTooLargeException,
     FileSaveException,
@@ -12,7 +12,8 @@ from exceptions.document_exceptions import (
 )
 
 from app.core.config import settings
-
+from app.services.document_service import DocumentService
+from app.workers.tasks import process_document_pipeline
 
 class DocumentUploadService:
     """
@@ -32,6 +33,7 @@ class DocumentUploadService:
         self.db = db_session
         self.storage = storage_provider
         self.logger = get_logger(__name__)
+        self.document = DocumentService()
 
     # 🔹 MAIN METHOD
     def upload_document(self, user_id: UUID, file: UploadFile):
@@ -52,16 +54,29 @@ class DocumentUploadService:
             print(f"File saved at: {saved_path}")
 
             # 4. Create DB entry
-            document = self.create_document_entry(
+            document = self.document.create_document(
+                self.db,
                 user_id=user_id,
                 file_name=file_name,
                 file_path=saved_path,
+            )
+
+            # create processing status of document in processing table 
+
+            self.document.create_processing_status(
+                self.db,
+                document.doc_id
             )
 
             # 5. Commit
             self.db.commit()
 
             self.logger.info("Document uploaded successfully")
+
+            self.logger.info(f"Triggering processing for doc_id={document.doc_id}")
+            # trigger async processing
+            process_document_pipeline.delay(str(document.doc_id))
+
 
             return {
                 "doc_id": document.doc_id,
@@ -139,23 +154,4 @@ class DocumentUploadService:
         except Exception as e:
             raise FileSaveException(str(e))
 
-    # 🔹 DB ENTRY
-    def create_document_entry(self, user_id: UUID, file_name: str, file_path: str):
-        self.logger.debug("Creating document DB entry")
-
-        try:
-            from models.user_document_model import UserDocument
-
-            document = UserDocument(
-                user_id=user_id,
-                document_name=file_name,
-                file_path=file_path,
-            )
-
-            self.db.add(document)
-            self.db.flush()
-
-            return document
-
-        except Exception as e:
-            raise DatabaseException(str(e))
+   

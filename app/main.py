@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 from fastapi.concurrency import asynccontextmanager
-import models
+from app import models
 from app.core.database_service import database_service
-from api.routes import router as auth_router
-from services.logger_service import get_logger
+from app.api.routes import router as auth_router
+from app.services.logger_service import get_logger
 
 logger = get_logger(__name__)
 
@@ -40,3 +40,11 @@ def health_check():
     Health check endpoint.
     """
     return {"message": "API is running successfully"}
+
+
+from app.workers.tasks import add
+
+if __name__ == "__main__":
+    result = add.delay(5, 7)
+    print("Task sent!")
+    print("Task result:", result.get(timeout=10))
