@@ -65,9 +65,15 @@ def process_document_pipeline(self, document_id: str):
         }
 
         # 4. Chunking
+        logger.info("🔥 ENTERED process_document()")
         chunks = chunking_service.process_document(document_data)
-        logger.info(f"Chunking completed: {len(chunks)} chunks")
+        
+        if chunks:
+            logger.info(f"CHUNK Found")
+        else:
+            logger.error("❌ No chunks returned from chunking service")
 
+        logger.info(f"Chunking completed")
         # 5. Embedding
         embedding_service.process_chunks(chunks)
         logger.info("Embedding + Pinecone storage completed")

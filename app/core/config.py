@@ -23,9 +23,10 @@ class Settings(BaseSettings):
     # -------------------------
     # Pinecone
     # -------------------------
-    PINECONE_API_KEY: str ="pcsk_7NGrZc_FSRqgqgNjhMUQxGyQ9nBzGQ8CEfhe1ocifTuURmDFfNtCs5RNZdVwue8uqm6HUu"
-    PINECONE_INDEX_NAME: str = "text-document"
-    PINECONE_ENVIRONMENT: str ="us-east-1"
+    PINECONE_API_KEY: str = os.getenv("PINECONE_API_KEY")
+    PINECONE_INDEX: str = os.getenv("PINECONE_INDEX")
+    PINECONE_ENVIRONMENT: str = "us-east-1"
+    PINECONE_DIMENSION: int = 1536
 
     # -------------------------
     # App Config
@@ -40,8 +41,8 @@ class Settings(BaseSettings):
     SECRET_KEY: str = os.getenv("SECRET_KEY", "supersecret")
     ALGORITHM: str = "HS256"
 
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 15))
-    REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 7))
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = (os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 15))
+    REFRESH_TOKEN_EXPIRE_DAYS: int = (os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 7))
 
 
     #-------------------------
@@ -62,9 +63,10 @@ class Settings(BaseSettings):
     # -------------------------
     # OpenAI       
     # -------------------------
-    OPENAI_API_KEY: str =""
+    OPENAI_API_KEY: str =(os.getenv("OPENAI_API_KEY"))
     EMBEDDING_MODEL: str = "text-embedding-3-small"
     EMBEDDING_BATCH_SIZE: int = 50
+    EMBEDDING_DIM: int = 1536
 
     #----------------------
     # redis config
@@ -81,7 +83,7 @@ class Settings(BaseSettings):
         "POSTGRES_USER",
         "POSTGRES_PASSWORD",
         "PINECONE_API_KEY",
-        "PINECONE_INDEX_NAME",
+        "PINECONE_INDEX",
         "PINECONE_ENVIRONMENT",
         "SECRET_KEY",
         "ALGORITHM",

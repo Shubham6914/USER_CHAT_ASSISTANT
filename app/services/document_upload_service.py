@@ -47,11 +47,11 @@ class DocumentUploadService:
 
             # 2. Generate filename
             file_name, file_path = self.generate_file_name(user_id, file)
-            print(f"Generated file name: {file_name}, file path: {file_path}")
+            self.logger.info(f"Generated file name: {file_name}, file path: {file_path}")
 
             # 3. Save file
             saved_path = self.save_file(file, file_path)
-            print(f"File saved at: {saved_path}")
+            self.logger.info(f"File saved at: {saved_path}")
 
             # 4. Create DB entry
             document = self.document.create_document(

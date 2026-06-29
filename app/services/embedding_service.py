@@ -1,7 +1,7 @@
 from typing import List, Dict
 from openai import OpenAI
 from app.services.logger_service import get_logger
-
+from app.services.vector_service import VectorStoreService
 
 from app.core.config import settings
 from app.api.dependencies import get_pinecone_index
@@ -15,18 +15,18 @@ class EmbeddingService:
     Service responsible for generating embeddings and storing them in Pinecone.
     """
 
-    def __init__(self, pinecone_index):
+    def __init__(self,vector_store:VectorStoreService):
         """
         Initialize EmbeddingService.
 
         Args:
             pinecone_index: Pinecone index instance
         """
-        self.index = get_pinecone_index
         self.logger = get_logger("embedding_service")
+        self.vector_store = vector_store
         self.batch_size = settings.EMBEDDING_BATCH_SIZE
         self.model = settings.EMBEDDING_MODEL
-        self.key = settings.OPENAI_API_KEY
+        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
     def process_chunks(self, chunks: List[Dict]) -> Dict:
         """
@@ -68,8 +68,15 @@ class EmbeddingService:
                 # Step 3: Create vector payload
                 vectors = self.create_vector_payload(batch, embeddings)
 
+                user_ids = set(chunk["metadata"].get("user_id", "default") for chunk in batch)
+
+                if len(user_ids) != 1:
+                    raise ValueError("Batch contains multiple user_ids")
+
+                namespace = user_ids.pop()
+
                 # Step 4: Store in Pinecone
-                self.store_embeddings(vectors)
+                self.vector_store.upsert(vectors=vectors, namespace=namespace)  
 
                 total_processed += len(batch)
 
@@ -104,11 +111,10 @@ class EmbeddingService:
 
         try:
             # Initialize OpenAI client (can be moved to __init__ later)
-            client = OpenAI(api_key=self.key)
 
             self.logger.debug(f"Generating embeddings for batch of size {len(texts)}")
 
-            response = client.embeddings.create(
+            response = self.client.embeddings.create(
                 model=self.model,
                 input=texts
             )
@@ -122,31 +128,12 @@ class EmbeddingService:
             raise
 
 
-    def create_vector_payload(
-        self,
-        chunks: List[Dict],
-        embeddings: List[List[float]]
-    ) -> List[Dict]:
-        """
-        Create Pinecone-compatible vector payload from chunks and embeddings.
-
-        This method:
-        - Maps each chunk to its corresponding embedding
-        - Prepares data in Pinecone upsert format
-
-        Args:
-            chunks (List[Dict]): List of chunk dictionaries
-            embeddings (List[List[float]]): Corresponding embedding vectors
-
-        Returns:
-            List[Dict]: List of vectors ready for Pinecone upsert
-        """
+    def create_vector_payload(self,chunks: List[Dict],embeddings: List[List[float]]) -> List[Dict]:
 
         if not chunks or not embeddings:
             self.logger.warning("Empty chunks or embeddings received")
             return []
 
-        # Strict validation (important)
         if len(chunks) != len(embeddings):
             self.logger.error(
                 f"Mismatch: {len(chunks)} chunks vs {len(embeddings)} embeddings"
@@ -157,15 +144,31 @@ class EmbeddingService:
             vectors = []
 
             for chunk, embedding in zip(chunks, embeddings):
+                metadata = chunk.get("metadata", {})
+
+                # ✅ Safe extraction
+                text = chunk.get("text", "")
+                user_id = str(metadata.get("user_id", ""))
+                document_id = metadata.get("document_id", "")
+                page_number = metadata.get("page_number", 0)
+                chunk_index = metadata.get("chunk_index", 0)
+
+                # ✅ Build vector
                 vector = {
-                    "id": chunk["id"],
+                    "id": chunk.get("id"),
                     "values": embedding,
-                    "metadata": chunk["metadata"]
+                    "metadata": {
+                        "text": text,  # 🔥 REQUIRED for retrieval
+                        "user_id": user_id,
+                        "document_id": document_id,
+                        "page_number": page_number,
+                        "chunk_index": chunk_index,
+                    },
                 }
+
                 vectors.append(vector)
 
             self.logger.debug(f"Created {len(vectors)} vector payloads")
-
             return vectors
 
         except KeyError as e:
@@ -176,34 +179,4 @@ class EmbeddingService:
             self.logger.error(f"Vector payload creation failed: {str(e)}")
             raise
 
-    
-    def store_embeddings(self, vectors: list) -> None:
-        """
-        Store embedding vectors in Pinecone.
-
-        This method:
-        - Retrieves Pinecone index instance
-        - Upserts vectors into the index
-
-        Args:
-            vectors (list): List of vector payloads
-        """
-
-        if not vectors:
-            self.logger.warning("No vectors to store in Pinecone")
-            return
-
-        try:
-            # Get Pinecone index from dependency
-            index = self.index  # already passed via constructor
-
-            self.logger.debug(f"Upserting {len(vectors)} vectors to Pinecone")
-
-            # Upsert vectors
-            index.upsert(vectors=vectors)
-
-            self.logger.info(f"Successfully stored {len(vectors)} vectors in Pinecone")
-
-        except Exception as e:
-            self.logger.error(f"Pinecone upsert failed: {str(e)}")
-            raise
+        

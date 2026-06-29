@@ -5,6 +5,8 @@ from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import SQLAlchemyError
 
 from pinecone import Pinecone, ServerlessSpec
+from functools import lru_cache
+
 
 from .config import settings
 from app.services.logger_service import get_logger
@@ -29,10 +31,17 @@ class DatabaseService:
         Initialize placeholders for database connections.
         Actual connections are initialized explicitly using init methods.
         """
+        self._initialized = False
         self._engine = None
         self._SessionLocal = None
         self._pinecone_client = None
         self._pinecone_index = None
+
+    def initialize(self):
+        if not self._initialized:
+            self.initialize_postgres_connection()
+            self.initialize_pinecone_connection()
+            self._initialized = True
 
     # ------------------------------------------------------------------
     # PostgreSQL
@@ -127,7 +136,8 @@ class DatabaseService:
                 api_key=settings.PINECONE_API_KEY
             )
 
-            index_name = settings.PINECONE_INDEX_NAME
+            index_name = settings.PINECONE_INDEX
+            dimension = settings.PINECONE_DIMENSION
 
             # Check if index exists
             existing_indexes = [
@@ -140,7 +150,7 @@ class DatabaseService:
 
                 self._pinecone_client.create_index(
                     name=index_name,
-                    dimension=1024,  # as per your embedding plan
+                    dimension=dimension,  # as per your embedding plan
                     metric="cosine",
                     spec=ServerlessSpec(
                         cloud="aws",
@@ -204,5 +214,10 @@ class DatabaseService:
 
         return health_status
     
+@lru_cache()
+def get_database_service():
+    db = DatabaseService()
+    db.initialize()
+    return db
 
 database_service = DatabaseService()

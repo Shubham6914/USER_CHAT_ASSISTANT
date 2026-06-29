@@ -66,10 +66,10 @@ def get_current_user(
         token = credentials.credentials
 
         user_id = UserService.verify_access_token(token)
-        print(f"Verified user_id from token: {user_id}")
+        logger.info(f"Verified user_id from token: {user_id}")
 
         user = db.query(User).filter(User.user_id == user_id).first()
-        print(f"Fetched user from DB: {user}")
+        logger.info(f"Fetched user from DB: {user}")
 
         if not user:
             raise HTTPException(

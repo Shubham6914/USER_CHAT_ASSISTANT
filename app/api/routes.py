@@ -10,6 +10,9 @@ from app.storage.local_storage import LocalStorage
 from app.services.document_upload_service import DocumentUploadService
 from app.schemas.document_schema import DocumentUploadResponse
 
+from app.schemas.retrieval import QueryRequest, QueryResponse
+from app.services.orchestration_service import OrchestrationService
+
 logger = get_logger(__name__)
 
 router = APIRouter(
@@ -172,3 +175,30 @@ def upload_document(
     )
 
     return service.upload_document(user_id=current_user.user_id, file=file)
+
+
+
+def get_orchestrator():
+
+    return OrchestrationService()
+
+@router.post("/query", response_model=QueryResponse)
+def run_query(
+    request: QueryRequest,
+    db=Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    orchestrator: OrchestrationService = Depends(get_orchestrator)
+):
+    """
+    Secure endpoint: only authenticated users can query their own data
+    """
+
+    result = orchestrator.run(
+        query=request.query,
+        user_id=current_user.user_id,   # ✅ FIXED
+        db=db
+    )
+
+    print(f"result-------->{result}")
+
+    return QueryResponse(**result)

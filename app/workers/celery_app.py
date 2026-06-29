@@ -1,14 +1,9 @@
 from celery import Celery
 from app.core.config import settings
-from app.core.database_service import DatabaseService
+from app.core.database_service import get_database_service
 
-# ✅ This is enough if DB initializes in __init__
-database_service = DatabaseService()
-# ✅ Initialize postgres  DB (FIXED)
-database_service.initialize_postgres_connection()
-# # ✅ Initialize pinecone  DB (FIXED)
-
-database_service.initialize_pinecone_connection()
+# ✅ Clean, safe, idempotent
+database_service = get_database_service()
 
 celery_app = Celery(
     "worker",

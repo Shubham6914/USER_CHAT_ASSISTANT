@@ -145,7 +145,7 @@ class UserService:
                 raise Exception("Invalid token type")
 
             user_id = UUID(payload["sub"])
-            print(f"Verified user_id from token: {user_id}")
+            logger.info(f"Verified user_id from token: {user_id}")
 
             logger.debug(f"Access token verified for user_id={user_id}")
             return user_id

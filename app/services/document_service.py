@@ -116,3 +116,25 @@ class DocumentService:
         except Exception as e:
             self.logger.error(f"Failed to create document: {str(e)}")
             raise
+
+    
+    def check_user_has_doc(self, db, user_id: str) -> bool:
+        """
+        Check if user has at least one uploaded document
+        """
+
+        if not user_id:
+            return False
+
+        try:
+            from app.models.user_document_model import UserDocument
+
+            doc = db.query(UserDocument).filter(
+                UserDocument.user_id == user_id
+            ).first()
+
+            return doc is not None
+
+        except Exception as e:
+            self.logger.error(f"Error checking user documents: {str(e)}")
+            return False
