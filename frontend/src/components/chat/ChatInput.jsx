@@ -1,27 +1,37 @@
 import { useState } from "react";
+import useChat from "../../hooks/useChat";
 
 function ChatInput() {
   const [message, setMessage] =
     useState("");
 
   const handleSubmit = (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (!message.trim())
-      return;
+  if (!message.trim()) {
+    return;
+  }
 
-    console.log(
-      "Message:",
-      message
-    );
+  if (!activeConversation) {
+    return;
+  }
 
-    /**
-     * TODO:
-     * Send Message API
-     */
+  /**
+   * User Message
+   */
+  addMessage(
+    activeConversation.id,
+    {
+      id: Date.now(),
 
-    setMessage("");
-  };
+      role: "user",
+
+      content: message,
+    }
+  );
+
+  setMessage("");
+};
 
   return (
     <div

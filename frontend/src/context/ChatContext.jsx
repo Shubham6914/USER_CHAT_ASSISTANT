@@ -1,101 +1,223 @@
-import {
-  createContext,
-  useEffect,
-  useState,
-} from "react";
+import { createContext, useEffect, useMemo, useState } from "react";
 
 import {
-  saveConversations,
   getConversations,
+  saveConversations,
 } from "../utils/storage";
 
-export const ChatContext =
-  createContext();
+/**
+ * =====================================================
+ * Chat Context
+ * =====================================================
+ *
+ * This context is responsible for:
+ *
+ * 1. Managing all conversations
+ * 2. Tracking the active conversation
+ * 3. Creating new conversations
+ * 4. Adding messages
+ * 5. Updating conversation title
+ * 6. Persisting conversations in localStorage
+ *
+ * Later this context will also handle:
+ * - Delete Conversation
+ * - Rename Conversation
+ * - Streaming Responses
+ * - Backend API Integration
+ * =====================================================
+ */
 
-function ChatProvider({
-  children,
-}) {
+export const ChatContext = createContext();
+
+function ChatProvider({ children }) {
+  // =====================================================
+  // STATE
+  // =====================================================
+
   /**
-   * All conversations
+   * Stores all conversations.
+   *
+   * Example:
+   *
+   * [
+   *   {
+   *      id: 123,
+   *      title: "Graph RAG",
+   *      messages: []
+   *   }
+   * ]
    */
-  const [
-    conversations,
-    setConversations,
-  ] = useState([]);
+  const [conversations, setConversations] = useState([]);
 
   /**
-   * Current active chat
+   * Stores the currently selected conversation ID.
    */
-  const [
-    activeConversationId,
-    setActiveConversationId,
-  ] = useState(null);
+  const [activeConversationId, setActiveConversationId] =
+    useState(null);
+
+  // =====================================================
+  // DERIVED STATE
+  // =====================================================
 
   /**
-   * Load conversations
+   * Finds the currently active conversation.
+   *
+   * Instead of searching everywhere,
+   * we calculate it once here.
+   */
+  const activeConversation = useMemo(() => {
+    return conversations.find(
+      (conversation) =>
+        conversation.id === activeConversationId
+    );
+  }, [conversations, activeConversationId]);
+
+  // =====================================================
+  // LOAD DATA
+  // =====================================================
+
+  /**
+   * Runs only once when the application starts.
+   *
+   * Loads conversations from localStorage.
    */
   useEffect(() => {
-    const storedConversations =
-      getConversations();
+    const storedConversations = getConversations();
 
-    if (
-      storedConversations.length
-    ) {
-      setConversations(
-        storedConversations
-      );
+    if (storedConversations.length > 0) {
+      setConversations(storedConversations);
 
+      // Select first conversation
       setActiveConversationId(
         storedConversations[0].id
       );
     }
   }, []);
 
+  // =====================================================
+  // SAVE DATA
+  // =====================================================
+
   /**
-   * Persist conversations
+   * Save conversations whenever they change.
    */
   useEffect(() => {
-    saveConversations(
-      conversations
-    );
+    saveConversations(conversations);
   }, [conversations]);
 
+  // =====================================================
+  // ACTIONS
+  // =====================================================
+
   /**
-   * Create new conversation
+   * Creates a new conversation.
    */
-  const createConversation =
-    () => {
-      const newConversation = {
-        id: Date.now(),
+  const createConversation = () => {
+    const newConversation = {
+      id: Date.now(),
 
-        title: "New Chat",
+      title: "New Chat",
 
-        messages: [],
-      };
-
-      setConversations(
-        (prev) => [
-          newConversation,
-          ...prev,
-        ]
-      );
-
-      setActiveConversationId(
-        newConversation.id
-      );
+      messages: [],
     };
 
+    setConversations((prev) => [
+      newConversation,
+      ...prev,
+    ]);
+
+    setActiveConversationId(newConversation.id);
+  };
+
+  /**
+   * Adds a new message
+   * to a conversation.
+   */
+  const addMessage = (
+    conversationId,
+    message
+  ) => {
+    setConversations((prev) =>
+      prev.map((conversation) => {
+        if (
+          conversation.id !== conversationId
+        ) {
+          return conversation;
+        }
+
+        return {
+          ...conversation,
+
+          messages: [
+            ...conversation.messages,
+            message,
+          ],
+        };
+      })
+    );
+  };
+
+  /**
+   * Updates conversation title.
+   */
+  const updateConversationTitle = (
+    conversationId,
+    title
+  ) => {
+    setConversations((prev) =>
+      prev.map((conversation) => {
+        if (
+          conversation.id !== conversationId
+        ) {
+          return conversation;
+        }
+
+        return {
+          ...conversation,
+
+          title,
+        };
+      })
+    );
+  };
+
+  /**
+   * Select conversation.
+   */
+  const selectConversation = (
+    conversationId
+  ) => {
+    setActiveConversationId(
+      conversationId
+    );
+  };
+
+  // =====================================================
+  // CONTEXT VALUE
+  // =====================================================
+
+  const value = {
+    conversations,
+
+    activeConversation,
+
+    activeConversationId,
+
+    createConversation,
+
+    addMessage,
+
+    updateConversationTitle,
+
+    selectConversation,
+  };
+
+  // =====================================================
+  // PROVIDER
+  // =====================================================
+
   return (
-    <ChatContext.Provider
-      value={{
-        conversations,
-        activeConversationId,
-
-        createConversation,
-
-        setActiveConversationId,
-      }}
-    >
+    <ChatContext.Provider value={value}>
       {children}
     </ChatContext.Provider>
   );

@@ -1,35 +1,8 @@
-// Temporary Mock Messages.
-
-// Later:
-
-// Context API
-// Backend
-// Streaming
-
-
 import ChatMessage from "./ChatMessage";
+import useChat from "../../hooks/useChat";
 
 function ChatWindow() {
-  const messages = [
-    {
-      id: 1,
-      role: "assistant",
-      content:
-        "Hello! How can I help you today?",
-    },
-    {
-      id: 2,
-      role: "user",
-      content:
-        "Explain Graph RAG.",
-    },
-    {
-      id: 3,
-      role: "assistant",
-      content:
-        "Graph RAG combines vector retrieval with knowledge graphs.",
-    },
-  ];
+  const { activeConversation } = useChat();
 
   return (
     <div
@@ -39,14 +12,18 @@ function ChatWindow() {
         p-6
       "
     >
-      {messages.map(
+      {!activeConversation && (
+        <div className="text-center mt-10">
+          Create a conversation to start chatting
+        </div>
+      )}
+
+      {activeConversation?.messages.map(
         (message) => (
           <ChatMessage
             key={message.id}
             role={message.role}
-            content={
-              message.content
-            }
+            content={message.content}
           />
         )
       )}
