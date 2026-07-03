@@ -1,44 +1,110 @@
 @import "tailwindcss";
 
-/* ------------------ */
-/* Light Theme */
-/* ------------------ */
+@custom-variant dark (&:where(.dark, .dark *));
 
+/* Custom design system variables */
 :root {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
+  /* Brand colors automatically recognized by Tailwind v4 */
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+  --color-brand-800: #3730a3;
+  --color-brand-900: #312e81;
 
-  --text-primary: #111827;
-  --text-secondary: #6b7280;
+  /* Custom animations automatically mapped by Tailwind v4 */
+  --animate-cursor-blink: cursor-blink 0.8s steps(2, start) infinite;
+  --animate-fade-in: fade-in 0.2s ease-out;
+
+  --bg-primary: #fcfbf9; /* Eye-friendly soft warm white background (Claude-like) */
+  --bg-secondary: #f4f3ef; /* Softer, slightly darker warm grey for Sidebars/Headers */
+  --bg-chat-bubble-assistant: #ffffff; /* Clean white bubble for bot messages */
+  --border-color: #e4e1db; /* Soft warm border lines */
+  --text-primary: #1a1a19; /* Softer dark charcoal text */
+  --text-secondary: #565551; /* Charcoal subtext */
+  --text-tertiary: #908f8a; /* Soft grey labels */
 }
 
-/* ------------------ */
-/* Dark Theme */
-/* ------------------ */
+/* Standard Keyframe Animations */
+@keyframes cursor-blink {
+  to { visibility: hidden; }
+}
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
 .dark {
-  --bg-primary: #202123;
-  --bg-secondary: #343541;
-
-  --text-primary: #ffffff;
-  --text-secondary: #d1d5db;
+  --bg-primary: #09090b; /* Zinc 950 */
+  --bg-secondary: #18181b; /* Zinc 900 */
+  --bg-chat-bubble-assistant: #27272a; /* Zinc 800 */
+  --border-color: #27272a; /* Zinc 800 */
+  --text-primary: #f4f4f5; /* Zinc 100 */
+  --text-secondary: #a1a1aa; /* Zinc 400 */
+  --text-tertiary: #52525b; /* Zinc 600 */
 }
 
 body {
   margin: 0;
   padding: 0;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
 
-  font-family:
-    Inter,
-    sans-serif;
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
 
-  background-color:
-    var(--bg-primary);
+::-webkit-scrollbar-track {
+  background: transparent;
+}
 
-  color:
-    var(--text-primary);
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
 
-  transition:
-    background-color 0.3s ease,
-    color 0.3s ease;
+.dark ::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+/* Custom styles for streaming typing cursor */
+.streaming-cursor::after {
+  content: "▊";
+  display: inline-block;
+  margin-left: 2px;
+  color: var(--color-brand-500);
+  animation: cursor-blink 0.8s steps(2, start) infinite;
+}
+
+/* Glassmorphism utility classes */
+.glass-panel {
+  background-color: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.dark .glass-panel {
+  background-color: rgba(24, 24, 27, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(39, 39, 42, 0.6);
 }

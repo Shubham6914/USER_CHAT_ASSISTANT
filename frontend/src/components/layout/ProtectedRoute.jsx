@@ -2,6 +2,8 @@ import { Navigate } from "react-router-dom";
 
 import useAuth from "../../hooks/useAuth";
 
+import Loader from "../common/Loader";
+
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
 
@@ -10,11 +12,7 @@ function ProtectedRoute({ children }) {
    * authentication check completes
    */
   if (loading) {
-    return (
-      <div className="h-screen flex items-center justify-center">
-        Loading...
-      </div>
-    );
+    return <Loader />;
   }
 
   /**
