@@ -22,10 +22,7 @@ function Login() {
         throw new Error("Please enter both email and password");
       }
 
-      // Simulating minor network load for smooth UX transition
-      await new Promise((resolve) => setTimeout(resolve, 600));
-
-      login(email, password);
+      await login(email, password);
       navigate("/chat");
     } catch (err) {
       setError(err.message);

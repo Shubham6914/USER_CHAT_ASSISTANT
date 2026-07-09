@@ -1,9 +1,16 @@
 import { useState, useRef, useEffect } from "react";
 import useChat from "../../hooks/useChat";
+import useAuth from "../../hooks/useAuth";
+import { uploadDocument } from "../../services/docService";
+import { queryAssistant } from "../../services/chatService";
 
 function ChatInput() {
-  const { activeConversation, addMessage } = useChat();
+  const { activeConversation, addMessage, updateMessage } = useChat();
+  const { user } = useAuth();
   const [message, setMessage] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  
   const textareaRef = useRef(null);
 
   // Auto-expand textarea height
@@ -17,29 +24,61 @@ function ChatInput() {
     }
   }, [message]);
 
-  const handleSubmit = (e) => {
+  /**
+   * BACKEND INTEGRATION: Submit Query to Assistant
+   * API Endpoint: POST http://127.0.0.1:8000/api/v1/auth/query
+   */
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!message.trim()) {
+    const messageText = message.trim();
+    if (!messageText || isGenerating || isUploading || !activeConversation) {
       return;
     }
 
-    if (!activeConversation) {
-      return;
-    }
-
-    /**
-     * User Message
-     */
+    // 1. Add user message locally
     addMessage(activeConversation.id, {
       id: Date.now(),
       role: "user",
-      content: message.trim(),
+      content: messageText,
     });
 
     setMessage("");
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
+    }
+
+    // 2. Add placeholder bot message with "Thinking..." status
+    const botMessageId = Date.now() + 1;
+    addMessage(activeConversation.id, {
+      id: botMessageId,
+      role: "assistant",
+      content: "Thinking...",
+    });
+
+    setIsGenerating(true);
+    try {
+      if (!user || !user.id) {
+        throw new Error("You must be logged in to send messages.");
+      }
+
+      // Call assistant query API in docService.js
+      const res = await queryAssistant(user.id, messageText);
+
+      // Extract result from backend response (supporting multiple potential response keys)
+      const botReply = res.response || res.answer || res.result || res.message || "No reply received.";
+
+      // 3. Update the temporary bot message with the actual response content
+      updateMessage(activeConversation.id, botMessageId, botReply);
+    } catch (err) {
+      // Show error in the chat bubble for transparent UX feedback
+      updateMessage(
+        activeConversation.id,
+        botMessageId,
+        `⚠️ **Query failed**: ${err.message || "An unexpected error occurred while communicating with the server."}`
+      );
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -50,12 +89,56 @@ function ChatInput() {
     }
   };
 
-  const handleAttachmentClick = () => {
-    // UI-only attachment feature
-    alert("File upload integration: TODO");
+  /**
+   * BACKEND INTEGRATION: Upload Document File
+   * API Endpoint: POST http://127.0.0.1:8000/api/v1/auth/upload-document
+   */
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!user || !user.id) {
+      alert("You must be logged in to upload files.");
+      return;
+    }
+
+    // Validate extension (only PDF and DOC/DOCX)
+    const allowedExtensions = ["pdf", "doc", "docx"];
+    const fileExtension = file.name.split(".").pop().toLowerCase();
+    if (!allowedExtensions.includes(fileExtension)) {
+      alert("Unsupported file format. Only PDF and DOC files are supported.");
+      return;
+    }
+
+    // Validate size (limit to 5MB)
+    const maxSizeBytes = 5 * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+      alert("File size exceeds the 5MB limit. Please upload a smaller file.");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      // Calling upload-document API in docService.js
+      await uploadDocument(user.id, file);
+
+      // Append system message notifying document upload was successful
+      addMessage(activeConversation.id, {
+        id: Date.now(),
+        role: "assistant",
+        content: `📁 **Uploaded Document**: "${file.name}" has been processed and added to the context. You can now ask questions about it!`,
+      });
+    } catch (err) {
+      alert(`Upload failed: ${err.message}`);
+    } finally {
+      setIsUploading(false);
+      // Reset input value to allow selecting same file again
+      e.target.value = "";
+    }
   };
 
   const isDisabled = !activeConversation;
+  const isInputDisabled = isDisabled || isUploading || isGenerating;
 
   return (
     <div className="border-t border-slate-200/80 dark:border-zinc-800/80 p-4 md:p-6 bg-[var(--bg-primary)] dark:bg-zinc-950 transition-colors duration-200">
@@ -69,6 +152,17 @@ function ChatInput() {
               ? "border-slate-200 dark:border-zinc-800 opacity-60 cursor-not-allowed" 
               : "border-slate-200 dark:border-zinc-800/80 focus-within:border-brand-500 dark:focus-within:border-brand-500/50 focus-within:ring-4 focus-within:ring-brand-500/10 focus-within:bg-[var(--bg-secondary)] dark:focus-within:bg-zinc-900/60"}
           `}>
+            
+            {/* Hidden native file input */}
+            <input
+              type="file"
+              id="doc-upload-input"
+              onChange={handleFileChange}
+              className="absolute w-0 h-0 opacity-0 pointer-events-none"
+              accept=".pdf,.doc,.docx"
+              disabled={isInputDisabled}
+            />
+
             {/* Expanding Textarea */}
             <textarea
               ref={textareaRef}
@@ -76,11 +170,19 @@ function ChatInput() {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={isDisabled}
-              placeholder={isDisabled ? "Select a workspace chat to begin writing..." : "Message GenAI Assistant..."}
+              disabled={isInputDisabled}
+              placeholder={
+                isDisabled 
+                  ? "Select a workspace chat to begin writing..." 
+                  : isUploading 
+                    ? "Uploading document to workspace..." 
+                    : isGenerating
+                      ? "NexusAI is thinking..."
+                      : "Message NexusAI Assistant..."
+              }
               className="
                 w-full resize-none bg-transparent px-3 py-1.5 text-sm
-                placeholder-slate-400 dark:placeholder-zinc-500
+                placeholder-slate-400 dark:placeholder-zinc-550
                 text-slate-800 dark:text-zinc-100 outline-none
                 disabled:cursor-not-allowed min-h-[38px] max-h-[200px]
               "
@@ -88,40 +190,71 @@ function ChatInput() {
 
             {/* Bottom Actions Row */}
             <div className="flex items-center justify-between px-2 pt-1 border-t border-slate-100 dark:border-zinc-900/40">
-              {/* Left attachment buttons */}
-              <button
-                type="button"
-                onClick={handleAttachmentClick}
-                disabled={isDisabled}
-                className="
-                  p-2 rounded-xl text-slate-400 dark:text-zinc-500
-                  hover:bg-slate-200/50 dark:hover:bg-zinc-800
-                  hover:text-slate-700 dark:hover:text-zinc-350
-                  transition-all disabled:opacity-50 disabled:hover:bg-transparent
-                  disabled:cursor-not-allowed cursor-pointer
-                "
-                title="Add attachment"
-              >
-                <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                </svg>
-              </button>
+              {/* Left attachment buttons with Tooltip */}
+              <div className="relative group/tooltip animate-fade-in">
+                <label
+                  htmlFor="doc-upload-input"
+                  className={`
+                    p-2 rounded-xl text-slate-400 dark:text-zinc-500
+                    hover:bg-slate-200/50 dark:hover:bg-zinc-800
+                    hover:text-slate-700 dark:hover:text-zinc-350
+                    transition-all flex items-center justify-center
+                    ${isInputDisabled
+                      ? "opacity-50 pointer-events-none cursor-not-allowed" 
+                      : "cursor-pointer"}
+                  `}
+                  title="Add attachment"
+                >
+                  {isUploading ? (
+                    // Small upload spinner
+                    <svg className="animate-spin h-4.5 w-4.5 text-brand-600 dark:text-brand-500" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  ) : (
+                    // Clip icon
+                    <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                    </svg>
+                  )}
+                </label>
+                
+                {/* Tooltip */}
+                <div className="
+                  absolute bottom-full left-0 mb-2 hidden group-hover/tooltip:block
+                  z-50 pointer-events-none whitespace-nowrap rounded-lg bg-slate-900/90
+                  dark:bg-zinc-800/90 text-white text-[10px] font-semibold px-2.5 py-1.5
+                  shadow-md border border-slate-700/50 dark:border-zinc-700/50 backdrop-blur-sm
+                  transition-all duration-200 animate-fade-in
+                ">
+                  Only PDF and DOC supported (Max 5MB)
+                </div>
+              </div>
 
               {/* Right submit button */}
               <button
                 type="submit"
-                disabled={isDisabled || !message.trim()}
+                disabled={isInputDisabled || !message.trim()}
                 className={`
                   flex items-center justify-center h-8.5 w-8.5 rounded-xl transition-all duration-200 cursor-pointer
-                  ${!message.trim() || isDisabled
+                  ${!message.trim() || isInputDisabled
                     ? "bg-slate-100 text-slate-300 dark:bg-zinc-900 dark:text-zinc-700 cursor-not-allowed"
                     : "bg-brand-600 text-white shadow-md shadow-brand-500/10 hover:bg-brand-700 active:scale-[0.96]"}
                 `}
-                title="Send Message"
+                title={isGenerating ? "Thinking..." : "Send Message"}
               >
-                <svg className="w-4 h-4 transform rotate-90" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-                </svg>
+                {isGenerating ? (
+                  // Small send button spinner
+                  <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                ) : (
+                  // Send icon arrow
+                  <svg className="w-4 h-4 transform rotate-90" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                  </svg>
+                )}
               </button>
             </div>
           </div>
@@ -129,7 +262,7 @@ function ChatInput() {
 
         {/* Small privacy notice */}
         <p className="text-[10px] text-center mt-2.5 text-slate-400 dark:text-zinc-550 select-none">
-          GenAI Assistant can make mistakes. Consider checking important information.
+          NexusAI Assistant can make mistakes. Consider checking important information.
         </p>
       </div>
     </div>

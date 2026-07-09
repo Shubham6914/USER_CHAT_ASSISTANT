@@ -2,9 +2,7 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Custom design system variables */
-:root {
-  /* Brand colors automatically recognized by Tailwind v4 */
+@theme {
   --color-brand-50: #eef2ff;
   --color-brand-100: #e0e7ff;
   --color-brand-200: #c7d2fe;
@@ -14,10 +12,25 @@
   --color-brand-800: #3730a3;
   --color-brand-900: #312e81;
 
-  /* Custom animations automatically mapped by Tailwind v4 */
+  /* Custom colors matching the classes used in the components */
+  --color-zinc-150: #ececef;
+  --color-zinc-350: #bcbcbf;
+  --color-zinc-550: #61616a;
+  --color-zinc-650: #494950;
+  --color-zinc-850: #202023;
+
+  --color-slate-205: #dadfe8;
+  --color-slate-350: #b2c0d2;
+  --color-slate-750: #293548;
+  --color-slate-850: #161f30;
+  --color-slate-855: #141c2c;
+
   --animate-cursor-blink: cursor-blink 0.8s steps(2, start) infinite;
   --animate-fade-in: fade-in 0.2s ease-out;
+}
 
+/* Custom design system variables */
+:root {
   --bg-primary: #fcfbf9; /* Eye-friendly soft warm white background (Claude-like) */
   --bg-secondary: #f4f3ef; /* Softer, slightly darker warm grey for Sidebars/Headers */
   --bg-chat-bubble-assistant: #ffffff; /* Clean white bubble for bot messages */

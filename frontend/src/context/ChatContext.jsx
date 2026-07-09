@@ -158,6 +158,26 @@ function ChatProvider({ children }) {
   };
 
   /**
+   * Updates a specific message in a conversation.
+   */
+  const updateMessage = (conversationId, messageId, newContent) => {
+    setConversations((prev) =>
+      prev.map((conversation) => {
+        if (conversation.id !== conversationId) {
+          return conversation;
+        }
+
+        return {
+          ...conversation,
+          messages: conversation.messages.map((message) =>
+            message.id === messageId ? { ...message, content: newContent } : message
+          ),
+        };
+      })
+    );
+  };
+
+  /**
    * Updates conversation title.
    */
   const updateConversationTitle = (
@@ -206,6 +226,8 @@ function ChatProvider({ children }) {
     createConversation,
 
     addMessage,
+
+    updateMessage,
 
     updateConversationTitle,
 

@@ -14,6 +14,7 @@
 
 import { createContext, useEffect, useState } from "react";
 
+import { signup, signin, verifyToken, refreshToken } from "../services/authService";
 import {
   saveUser,
   getUser,
@@ -24,6 +25,29 @@ import {
 
 // Create global auth context
 export const AuthContext = createContext();
+
+/**
+ * Decodes base64 JWT token payload
+ */
+const decodeToken = (token) => {
+  try {
+    if (!token) return null;
+    const base64Url = token.split(".")[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      window
+        .atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error("JWT token decoding failed", e);
+    return null;
+  }
+};
 
 function AuthProvider({ children }) {
   /**
@@ -36,61 +60,92 @@ function AuthProvider({ children }) {
    * Load user when application starts
    */
   useEffect(() => {
-    const storedUser = getUser();
+    const checkAuth = async () => {
+      const storedUser = getUser();
 
-    if (storedUser) {
-      setUser(storedUser);
-    }
-    setLoading(false);
+      if (storedUser && storedUser.token) {
+        try {
+          // BACKEND INTEGRATION: Calling verify-token endpoint POST http://127.0.0.1:8000/api/v1/auth/verify-token
+          await verifyToken(storedUser.token);
+          setUser(storedUser);
+        } catch (verifyErr) {
+          // If access token verification fails, attempt to refresh using the refresh token
+          if (storedUser.refreshToken) {
+            try {
+              // BACKEND INTEGRATION: Calling refresh endpoint POST http://127.0.0.1:8000/api/v1/auth/refresh
+              const refreshData = await refreshToken(storedUser.refreshToken);
+              const newToken = refreshData.access_token || refreshData.token || storedUser.token;
+              
+              let userId = storedUser.id;
+              if (newToken) {
+                const decoded = decodeToken(newToken);
+                if (decoded && decoded.sub) {
+                  userId = decoded.sub;
+                }
+              }
+
+              const updatedUser = {
+                ...storedUser,
+                id: userId,
+                token: newToken,
+                refreshToken: refreshData.refresh_token || refreshData.refreshToken || storedUser.refreshToken,
+              };
+              
+              saveUser(updatedUser);
+              setUser(updatedUser);
+            } catch (refreshErr) {
+              // Both verification and refresh failed, clear session
+              removeUser();
+              setUser(null);
+            }
+          } else {
+            // Verification failed and no refresh token found, clear session
+            removeUser();
+            setUser(null);
+          }
+        }
+      }
+      setLoading(false);
+    };
+
+    checkAuth();
   }, []);
 
   /**
    * Register new user
    */
-  const register = ({ name, email, password }) => {
-    const users = getRegisteredUsers();
-
-    const emailExists = users.find(
-      (user) => user.email === email
-    );
-
-    if (emailExists) {
-      throw new Error("Email already exists");
-    }
-
-    const newUser = {
-      id: Date.now(),
-      name,
-      email,
-      password,
-    };
-
-    users.push(newUser);
-
-    saveRegisteredUsers(users);
-
+  const register = async ({ name, email, password }) => {
+    // BACKEND INTEGRATION: Calling signup endpoint POST http://127.0.0.1:8000/api/v1/auth/signup
+    await signup({ name, email, password });
     return true;
   };
 
   /**
    * Login user
    */
-  const login = (email, password) => {
-    const users = getRegisteredUsers();
+  const login = async (email, password) => {
+    // BACKEND INTEGRATION: Calling login endpoint POST http://127.0.0.1:8000/api/v1/auth/login
+    const data = await signin(email, password);
 
-    const matchedUser = users.find(
-      (user) =>
-        user.email === email &&
-        user.password === password
-    );
-
-    if (!matchedUser) {
-      throw new Error("Invalid credentials");
+    const token = data.access_token || data.token || data.jwt;
+    let userId = Date.now();
+    if (token) {
+      const decoded = decodeToken(token);
+      if (decoded && decoded.sub) {
+        userId = decoded.sub;
+      }
     }
 
-    saveUser(matchedUser);
+    const loggedUser = {
+      id: userId,
+      name: data.user?.user_name || data.user?.name || data.name || email.split("@")[0],
+      email: data.user?.user_email || data.user?.email || data.email || email,
+      token: token || "mock-token",
+      refreshToken: data.refresh_token || data.refreshToken || null,
+    };
 
-    setUser(matchedUser);
+    saveUser(loggedUser);
+    setUser(loggedUser);
 
     return true;
   };

@@ -33,10 +33,7 @@ function Register() {
         throw new Error("All fields are required");
       }
 
-      // Simulating network duration
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
-      register(formData);
+      await register(formData);
       alert("Registration successful! Please log in.");
       navigate("/login");
     } catch (err) {
