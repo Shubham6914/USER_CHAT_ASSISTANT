@@ -36,6 +36,6 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    chats = relationship("UserChat", back_populates="user", cascade="all, delete-orphan")
-    documents = relationship("UserDocument", back_populates="user", cascade="all, delete-orphan")
-    refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
+    chats = relationship("UserChat", back_populates="user", cascade="all, delete-orphan",passive_deletes=True)
+    documents = relationship("UserDocument", back_populates="user", cascade="all, delete-orphan",passive_deletes=True)
+    refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)

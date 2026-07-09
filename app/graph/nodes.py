@@ -111,5 +111,5 @@ class GraphNodes:
 
         return {
             **state,
-            "response": response   # ✅ THIS LINE FIXES EVERYTHING
+            "final_response": response
         }

@@ -23,7 +23,7 @@ class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
     message_id = Column(UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4, unique=True)
-    chat_id = Column(UUID(as_uuid=True), ForeignKey("user_chats.chat_id"), nullable=False)
+    chat_id = Column(UUID(as_uuid=True), ForeignKey("user_chats.chat_id",ondelete="CASCADE"), nullable=False)
     content = Column(Text, nullable=False)
     role = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)

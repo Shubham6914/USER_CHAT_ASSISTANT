@@ -46,7 +46,7 @@ class OrchestrationService:
             print("result in orchestration------->",result, type(result))
 
             return {
-                "response": result.get("response"),
+                "response": result.get("final_response"),
                 "intent": result.get("intent"),
                 "metadata": {
                     "tool_used": result.get("tool_used"),
