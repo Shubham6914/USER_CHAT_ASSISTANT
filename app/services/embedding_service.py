@@ -1,7 +1,6 @@
 from typing import List, Dict
 from openai import OpenAI
 from app.services.logger_service import get_logger
-from app.services.vector_service import VectorStoreService
 
 from app.core.config import settings
 from app.api.dependencies import get_pinecone_index
@@ -15,7 +14,7 @@ class EmbeddingService:
     Service responsible for generating embeddings and storing them in Pinecone.
     """
 
-    def __init__(self,vector_store:VectorStoreService):
+    def __init__(self):
         """
         Initialize EmbeddingService.
 
@@ -23,72 +22,90 @@ class EmbeddingService:
             pinecone_index: Pinecone index instance
         """
         self.logger = get_logger("embedding_service")
-        self.vector_store = vector_store
         self.batch_size = settings.EMBEDDING_BATCH_SIZE
         self.model = settings.EMBEDDING_MODEL
         self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
-    def process_chunks(self, chunks: List[Dict]) -> Dict:
+    def process_chunks(self, chunks: List[Dict]) -> List[Dict]:
         """
-        Main entry point for embedding pipeline.
+        Generate embeddings and create vector payload.
 
         This method:
         1. Batches chunks
         2. Generates embeddings
-        3. Stores vectors in Pinecone
+        3. Creates vector payload
 
         Args:
             chunks (List[Dict]): List of chunk dictionaries
 
         Returns:
-            Dict: Status response with processed count
+            List[Dict]: Pinecone vector payloads
         """
 
         if not chunks:
-            self.logger.warning("No chunks received for embedding")
-            return {"status": "no_data", "processed": 0}
+            self.logger.warning(
+                "No chunks received for embedding"
+            )
+            return []
 
-        self.logger.info(f"Starting embedding for {len(chunks)} chunks")
 
-        total_processed = 0
+        self.logger.info(
+            f"Starting embedding for {len(chunks)} chunks"
+        )
+
+
+        all_vectors = []
+
 
         try:
-            # Batch processing
+
             for i in range(0, len(chunks), self.batch_size):
+
                 batch = chunks[i:i + self.batch_size]
 
-                self.logger.debug(f"Processing batch {i // self.batch_size + 1}")
 
-                # Step 1: Extract texts
-                texts = [chunk["text"] for chunk in batch]
+                self.logger.debug(
+                    f"Processing batch {i // self.batch_size + 1}"
+                )
 
-                # Step 2: Generate embeddings
-                embeddings = self.generate_embeddings(texts)
 
-                # Step 3: Create vector payload
-                vectors = self.create_vector_payload(batch, embeddings)
+                # Extract texts
+                texts = [
+                    chunk["text"]
+                    for chunk in batch
+                ]
 
-                user_ids = set(chunk["metadata"].get("user_id", "default") for chunk in batch)
 
-                if len(user_ids) != 1:
-                    raise ValueError("Batch contains multiple user_ids")
+                # Generate embeddings
+                embeddings = self.generate_embeddings(
+                    texts
+                )
 
-                namespace = user_ids.pop()
 
-                # Step 4: Store in Pinecone
-                self.vector_store.upsert(vectors=vectors, namespace=namespace)  
+                # Create vector payload
+                vectors = self.create_vector_payload(
+                    batch,
+                    embeddings
+                )
 
-                total_processed += len(batch)
 
-            self.logger.info(f"Embedding completed. Total processed: {total_processed}")
+                all_vectors.extend(vectors)
 
-            return {
-                "status": "success",
-                "processed": total_processed
-            }
+
+            self.logger.info(
+                f"Embedding completed. Total vectors created: {len(all_vectors)}"
+            )
+
+
+            return all_vectors
+
 
         except Exception as e:
-            self.logger.error(f"Embedding process failed: {str(e)}")
+
+            self.logger.error(
+                f"Embedding process failed: {str(e)}"
+            )
+
             raise
 
     from openai import OpenAI

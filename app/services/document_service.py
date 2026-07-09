@@ -1,6 +1,6 @@
 from app.services.logger_service import get_logger
 from app.models.processing_status_model import ProcessingStatus
-from app.models.enums import ProcessingStatusEnum
+from app.models.enums import ProcessingStatusEnum,ProcessingStepEnum
 
 from app.exceptions.document_exceptions import (
     InvalidFileTypeException,
@@ -20,6 +20,7 @@ class DocumentService:
     def __init__(self):
         self.logger = get_logger("document_service")
 
+
     def create_processing_status(self, db, document_id):
         """
         Create initial processing status for a document.
@@ -28,10 +29,13 @@ class DocumentService:
         try:
             status = ProcessingStatus(
                 document_id=document_id,
-                status=ProcessingStatusEnum.PENDING
+                status=ProcessingStatusEnum.PENDING,
+                current_step=ProcessingStepEnum.DOCUMENT_SAVED,
+                progress=0
             )
 
             db.add(status)
+
             db.commit()
             db.refresh(status)
 
@@ -45,6 +49,7 @@ class DocumentService:
             self.logger.error(
                 f"Failed to create processing status: {str(e)}"
             )
+
             db.rollback()
             raise
 
@@ -52,11 +57,13 @@ class DocumentService:
         self,
         db,
         document_id,
-        status,
-        error_message: str = None
-    ):
-        """
-        Update processing status for a document.
+        status=None,
+        current_step=None,
+        progress=None,
+        error_message=None
+        ):
+        """ss
+        Update processing state for a document.
         """
 
         try:
@@ -69,26 +76,43 @@ class DocumentService:
                     f"Processing status not found for document {document_id}"
                 )
 
-            record.status = status
 
-            if status == ProcessingStatusEnum.FAILED:
+            if status is not None:
+                record.status = status
+
+
+            if current_step is not None:
+                record.current_step = current_step
+
+
+            if progress is not None:
+                record.progress = progress
+
+
+            if error_message is not None:
                 record.error_message = error_message
-            else:
-                record.error_message = None
 
-            db.commit()
-            db.refresh(record)
+
+            db.flush()
 
             self.logger.info(
-                f"Updated processing status for document {document_id} → {status}"
+                f"""
+                Updated processing state:
+                document={document_id}
+                status={record.status}
+                step={record.current_step}
+                progress={record.progress}
+                """
             )
 
             return record
+
 
         except Exception as e:
             self.logger.error(
                 f"Failed to update processing status: {str(e)}"
             )
+
             db.rollback()
             raise
 

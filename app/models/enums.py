@@ -10,3 +10,11 @@ class ProcessingStatusEnum(str, Enum):
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
+
+
+class ProcessingStepEnum(str, Enum):
+    DOCUMENT_SAVED = "document_saved"
+    CHUNKING = "chunking"
+    EMBEDDING = "embedding"
+    VECTOR_STORE = "vector_store"
+    COMPLETED = "completed"

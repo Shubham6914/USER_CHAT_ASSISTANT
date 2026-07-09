@@ -1,12 +1,12 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, Enum, String, DateTime, ForeignKey, Enum as SqlEnum
+from sqlalchemy import Column, Enum, String, DateTime, ForeignKey, Enum as SqlEnum, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from .base import Base
-from .enums import ProcessingStatusEnum
+from .enums import ProcessingStatusEnum, ProcessingStepEnum
 
 
 class ProcessingStatus(Base):
@@ -39,6 +39,20 @@ class ProcessingStatus(Base):
         ForeignKey("user_documents.doc_id", ondelete="CASCADE"),
         nullable=False,
         unique=True  # ensures 1:1 relationship
+    )
+    current_step = Column(
+        SqlEnum(
+        ProcessingStepEnum,
+        name="processingstepenum"
+    ),
+        nullable=False,
+        default=ProcessingStepEnum.DOCUMENT_SAVED
+    )
+
+    progress = Column(
+        Integer,
+        nullable=False,
+        default=0
     )
 
     status = Column(
