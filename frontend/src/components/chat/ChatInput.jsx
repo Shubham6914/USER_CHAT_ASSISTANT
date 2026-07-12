@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import useChat from "../../hooks/useChat";
 import useAuth from "../../hooks/useAuth";
 import { uploadDocument, getDocumentStatus } from "../../services/docService";
-import { queryAssistant } from "../../services/chatService";
+import { queryAssistantStream } from "../../services/chatService";
 
 function ChatInput() {
   const { activeConversation, addMessage, updateMessage } = useChat();
@@ -27,6 +27,7 @@ function ChatInput() {
   }, [message]);
 
   /**
+   * BACKEND INTEGRATION: Submit Query to Assistant & Stream Responses
    * API Endpoint: POST http://127.0.0.1:8000/api/v1/documents/query
    */
   const handleSubmit = async (e) => {
@@ -63,22 +64,47 @@ function ChatInput() {
         throw new Error("You must be logged in to send messages.");
       }
 
-      // Call assistant query API in chatService.js
-      const res = await queryAssistant(user.id, messageText);
+      let streamedText = "";
+      let hasReceivedFirstChunk = false;
 
-      // Extract result from backend response (supporting multiple potential response keys)
-      const botReply = res.response || res.answer || res.result || res.message || "No reply received.";
-
-      // 3. Update the temporary bot message with the actual response content
-      updateMessage(activeConversation.id, botMessageId, botReply);
+      // Call assistant query streaming API in chatService.js
+      await queryAssistantStream(
+        user.id,
+        messageText,
+        (chunk) => {
+          if (!hasReceivedFirstChunk) {
+            hasReceivedFirstChunk = true;
+            // Clear "Thinking..." placeholder and start printing chunk
+            streamedText = chunk;
+          } else {
+            streamedText += chunk;
+          }
+          // Update the message bubble content in real-time (token-by-token)
+          updateMessage(activeConversation.id, botMessageId, streamedText);
+        },
+        (sources) => {
+          // Update the message bubble state with the retrieved document sources list
+          updateMessage(activeConversation.id, botMessageId, { sources: sources });
+        },
+        () => {
+          setIsGenerating(false);
+        },
+        (err) => {
+          // Show error in the chat bubble for transparent UX feedback
+          updateMessage(
+            activeConversation.id,
+            botMessageId,
+            `⚠️ **Query failed**: ${err.message || "An unexpected error occurred while communicating with the server."}`
+          );
+          setIsGenerating(false);
+        }
+      );
     } catch (err) {
-      // Show error in the chat bubble for transparent UX feedback
       updateMessage(
         activeConversation.id,
         botMessageId,
-        `⚠️ **Query failed**: ${err.message || "An unexpected error occurred while communicating with the server."}`
+        `⚠️ **Query failed**: ${err.message || "An unexpected error occurred."}`
       );
-    } finally {
       setIsGenerating(false);
     }
   };

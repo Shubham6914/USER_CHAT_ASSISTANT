@@ -28,19 +28,44 @@ class ResponseService:
     # CORE LLM CALL
     # ------------------------------------------------------------------
 
-    def _call_llm(self, messages: list) -> str:
+    # Existing non-streaming call
+    # def _call_llm(self, messages: list) -> str:
+    #     try:
+    #         self.logger.info("[LLM] Calling model")
+
+    #         response_text = self.llm_client.chat_completion(messages)
+
+    #         self.logger.debug(
+    #             f"[LLM] Response received: {len(response_text)} chars"
+    #         )
+
+    #         return response_text
+
+    #     except Exception as e:
+    #         self.logger.error(
+    #             f"[LLM] Failed: {str(e)}",
+    #             exc_info=True
+    #         )
+    #         raise
+    
+    # New streaming call
+    def _stream_llm(self, messages: list):
+
         try:
-            self.logger.info("[LLM] Calling model")
+            self.logger.info("[LLM] Starting streaming")
 
-            response_text = self.llm_client.chat_completion(messages)
-
-            self.logger.debug(f"[LLM] Response received: {len(response_text)} chars")
-
-            return response_text
+            for chunk in self.llm_client.stream_chat_completion(messages):
+                yield chunk
 
         except Exception as e:
-            self.logger.error(f"[LLM] Failed: {str(e)}", exc_info=True)
+            self.logger.error(
+                f"[LLM Streaming] Failed: {str(e)}",
+                exc_info=True
+            )
             raise
+
+
+    
     # ------------------------------------------------------------------
     # 1. DIRECT RESPONSE
     # ------------------------------------------------------------------
@@ -49,7 +74,7 @@ class ResponseService:
         self,
         query: str,
         system_instructions: str
-    ) -> str:
+    ):
         """
         Generate response without retrieval
 
@@ -64,7 +89,7 @@ class ResponseService:
                 {"role": "user", "content": query}
             ]
 
-            return self._call_llm(messages)
+            yield from self._stream_llm(messages)
 
         except Exception as e:
             self.logger.error(f"[Response] Direct failed: {str(e)}")
@@ -79,7 +104,7 @@ class ResponseService:
         query: str,
         context: str,
         system_instructions: Optional[str] = None
-    ) -> str:
+    ):
         """
         Generate response using retrieved context
         """
@@ -106,7 +131,7 @@ class ResponseService:
                 {"role": "user", "content": prompt}
             ]
 
-            return self._call_llm(messages)
+            yield from self._stream_llm(messages)
 
         except Exception as e:
             self.logger.error(f"[Response] RAG failed: {str(e)}")
@@ -121,7 +146,7 @@ class ResponseService:
         query: str,
         tool_name: str,
         tool_result: Dict[str, Any]
-    ) -> str:
+    ):
         """
         Convert tool output into natural language response
 
@@ -151,7 +176,7 @@ class ResponseService:
                 {"role": "user", "content": prompt}
             ]
 
-            return self._call_llm(messages)
+            yield from self._stream_llm(messages)
 
         except Exception as e:
             self.logger.error(f"[Response] Tool response failed: {str(e)}")

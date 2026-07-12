@@ -6,10 +6,12 @@ function ChatWindow() {
   const { activeConversation } = useChat();
   const messagesEndRef = useRef(null);
 
-  // Auto Scroll to Bottom on message size change
+  const lastMessageContent = activeConversation?.messages?.[activeConversation.messages.length - 1]?.content;
+
+  // Auto Scroll to Bottom on message list size or stream text updates
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [activeConversation?.messages?.length]);
+  }, [activeConversation?.messages?.length, lastMessageContent]);
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-6 md:p-8 space-y-6 bg-[var(--bg-primary)] dark:bg-zinc-950/20">
@@ -107,6 +109,7 @@ function ChatWindow() {
               key={message.id}
               role={message.role}
               content={message.content}
+              sources={message.sources}
             />
           ))}
           {/* Scrolling Anchor */}

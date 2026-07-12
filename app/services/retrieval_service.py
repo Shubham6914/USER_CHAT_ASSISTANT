@@ -123,7 +123,6 @@ class RetrievalService:
             )
 
             matches = response.get("matches", [])
-            print("matches-------->",matches)
 
             parsed_results = []
 

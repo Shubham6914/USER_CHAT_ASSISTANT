@@ -34,9 +34,18 @@ class LLMClient:
         response = llm.invoke(messages)
         return response.content
     
-    @property
-    def llm(self):
-        return self._llm
+    def stream_chat_completion(self, messages):
+
+        llm = self.get_llm()
+
+        for chunk in llm.stream(messages):
+
+            if chunk.content:
+                yield chunk.content
+        
+        @property
+        def llm(self):
+            return self._llm
 
 
 # Singleton instance (IMPORTANT)

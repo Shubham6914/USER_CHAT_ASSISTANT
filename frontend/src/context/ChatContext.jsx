@@ -157,10 +157,8 @@ function ChatProvider({ children }) {
     );
   };
 
-  /**
-   * Updates a specific message in a conversation.
-   */
-  const updateMessage = (conversationId, messageId, newContent) => {
+  const updateMessage = (conversationId, messageId, updates) => {
+    const updateObj = typeof updates === "string" ? { content: updates } : updates;
     setConversations((prev) =>
       prev.map((conversation) => {
         if (conversation.id !== conversationId) {
@@ -170,7 +168,7 @@ function ChatProvider({ children }) {
         return {
           ...conversation,
           messages: conversation.messages.map((message) =>
-            message.id === messageId ? { ...message, content: newContent } : message
+            message.id === messageId ? { ...message, ...updateObj } : message
           ),
         };
       })

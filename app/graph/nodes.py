@@ -87,29 +87,4 @@ class GraphNodes:
         # no-op node
         return {}
 
-    # ---------------------------
-    # 5. RESPONSE NODE
-    # ---------------------------
-    def response_node(self, state: AgentState) -> AgentState:
-        query = state["query"]
-
-        context = ""
-
-        if state.get("retrieved_docs"):
-            context = "\n".join([str(doc) for doc in state["retrieved_docs"]])
-
-        elif state.get("tool_response"):
-            context = str(state["tool_response"]["data"])
-
-        response = self.response_service.generate_rag_response(
-            query=query,
-            context=context,
-            system_instructions=LLM_INSTRUCTIONS
-        )
-
-        print("final node response---------->", response)
-
-        return {
-            **state,
-            "final_response": response
-        }
+    

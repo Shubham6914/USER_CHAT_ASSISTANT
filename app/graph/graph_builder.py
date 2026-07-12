@@ -6,29 +6,21 @@ from app.graph.router import route_query
 
 
 def build_graph():
-    # initialize nodes
+
     nodes = GraphNodes()
 
-    # create graph
     graph = StateGraph(AgentState)
 
-    # ---------------------------
-    # ADD NODES
-    # ---------------------------
+    # Nodes
     graph.add_node("analyze_node", nodes.analyze_node)
     graph.add_node("rag_node", nodes.rag_node)
     graph.add_node("tool_node", nodes.tool_node)
     graph.add_node("direct_node", nodes.direct_node)
-    graph.add_node("response_node", nodes.response_node)
 
-    # ---------------------------
-    # ENTRY POINT
-    # ---------------------------
+    # Entry
     graph.set_entry_point("analyze_node")
 
-    # ---------------------------
-    # CONDITIONAL ROUTING
-    # ---------------------------
+    # Routing
     graph.add_conditional_edges(
         "analyze_node",
         route_query,
@@ -39,17 +31,9 @@ def build_graph():
         },
     )
 
-    # ---------------------------
-    # COMMON FLOW → RESPONSE
-    # ---------------------------
-    graph.add_edge("rag_node", "response_node")
-    graph.add_edge("tool_node", "response_node")
-    graph.add_edge("direct_node", "response_node")
+    # End after planning
+    graph.add_edge("rag_node", END)
+    graph.add_edge("tool_node", END)
+    graph.add_edge("direct_node", END)
 
-    # ---------------------------
-    # END
-    # ---------------------------
-    graph.add_edge("response_node", END)
-
-    # compile graph
     return graph.compile()

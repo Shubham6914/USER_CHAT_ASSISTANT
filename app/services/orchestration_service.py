@@ -2,12 +2,14 @@ from app.graph.graph_builder import build_graph
 from app.graph.state import AgentState
 import traceback
 from app.services.document_service import DocumentService
+from app.services.streaming_service import StreamingService
 
 
 class OrchestrationService:
     def __init__(self):
         # compile graph once
         self.graph = build_graph()
+        self.streaming_service = StreamingService()
 
     def run(self, query: str, user_id: str | None = None, chat_id: str | None = None, db = None) -> str:
         """
@@ -42,17 +44,12 @@ class OrchestrationService:
             state["chat_id"] = chat_id
 
         try:
+            # result = self.graph.invoke(state)
             result = self.graph.invoke(state)
+
             print("result in orchestration------->",result, type(result))
 
-            return {
-                "response": result.get("final_response"),
-                "intent": result.get("intent"),
-                "metadata": {
-                    "tool_used": result.get("tool_used"),
-                    "sources": result.get("sources"),
-                }
-            }
+            return self.streaming_service.stream_response(result)
 
         except Exception as e:
             traceback.print_exc()      # prints full stack trace

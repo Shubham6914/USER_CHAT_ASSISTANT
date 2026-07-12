@@ -20,6 +20,7 @@ from app.services.document_upload_service import DocumentUploadService
 from app.services.document_service import DocumentService
 from app.services.orchestration_service import OrchestrationService
 from app.schemas.retrieval import QueryRequest, QueryResponse
+from fastapi.responses import StreamingResponse
 
 
 router = APIRouter(
@@ -55,11 +56,7 @@ def upload_document(
     )
 
 
-def get_orchestrator():
-
-    return OrchestrationService()
-
-@router.post("/query", response_model=QueryResponse)
+@router.post("/query")
 def run_query(
     request: QueryRequest,
     db=Depends(get_db),
@@ -70,15 +67,16 @@ def run_query(
     Secure endpoint: only authenticated users can query their own data
     """
 
-    result = orchestrator.run(
+    response_stream = orchestrator.run(
         query=request.query,
-        user_id=current_user.user_id,   # ✅ FIXED
+        user_id=current_user.user_id,
         db=db
     )
 
-    print(f"result-------->{result}")
-
-    return QueryResponse(**result)
+    return StreamingResponse(
+        response_stream,
+        media_type="text/event-stream"
+    )
 
 
 @router.get(
