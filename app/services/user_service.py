@@ -260,6 +260,7 @@ class UserService:
             Exception: If user already exists or DB error occurs.
         """
         try:
+            user_email = user_email.strip().lower()
             # check if user already exists
             existing_user = db.query(User).filter(User.user_email == user_email).first()
             if existing_user:
@@ -321,8 +322,13 @@ class UserService:
         """
         try:
             # get user
-            user = db.query(User).filter(User.user_email == user_email).first()
-
+            
+            user_email = user_email.strip().lower()
+            user = (
+                db.query(User)
+                .filter(User.user_email == user_email)
+                .first()
+            )
             if not user:
                 raise Exception("Invalid email or password")
 

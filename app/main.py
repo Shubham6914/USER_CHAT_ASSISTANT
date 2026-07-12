@@ -4,7 +4,8 @@ from fastapi.concurrency import asynccontextmanager
 
 from app import models
 from app.core.database_service import database_service
-from app.api.routes import router as auth_router
+from app.api.routes.auth_routes import router as auth_router
+from app.api.routes.document_routes import router as document_router
 from app.services.logger_service import get_logger
 
 logger = get_logger(__name__)
@@ -38,8 +39,9 @@ app.add_middleware(
 )
 
 # Include routers after middleware
+# Register routers
 app.include_router(auth_router)
-
+app.include_router(document_router)
 
 @app.get("/")
 def health_check():

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import useChat from "../../hooks/useChat";
 import useAuth from "../../hooks/useAuth";
-import { uploadDocument } from "../../services/docService";
+import { uploadDocument, getDocumentStatus } from "../../services/docService";
 import { queryAssistant } from "../../services/chatService";
 
 function ChatInput() {
@@ -9,6 +9,8 @@ function ChatInput() {
   const { user } = useAuth();
   const [message, setMessage] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(null);
+  const [uploadStep, setUploadStep] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   
   const textareaRef = useRef(null);
@@ -25,8 +27,7 @@ function ChatInput() {
   }, [message]);
 
   /**
-   * BACKEND INTEGRATION: Submit Query to Assistant
-   * API Endpoint: POST http://127.0.0.1:8000/api/v1/auth/query
+   * API Endpoint: POST http://127.0.0.1:8000/api/v1/documents/query
    */
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -62,7 +63,7 @@ function ChatInput() {
         throw new Error("You must be logged in to send messages.");
       }
 
-      // Call assistant query API in docService.js
+      // Call assistant query API in chatService.js
       const res = await queryAssistant(user.id, messageText);
 
       // Extract result from backend response (supporting multiple potential response keys)
@@ -90,8 +91,30 @@ function ChatInput() {
   };
 
   /**
-   * BACKEND INTEGRATION: Upload Document File
-   * API Endpoint: POST http://127.0.0.1:8000/api/v1/auth/upload-document
+   * Maps current backend processing steps and progress values to descriptive user-facing strings
+   */
+  const getStepDescription = (step, progress) => {
+    switch (step) {
+      case "document_saved":
+        return `Saving document to system... (${progress}%)`;
+      case "chunking":
+        return `Splitting content into text segments... (${progress}%)`;
+      case "embedding":
+        return `Generating semantic embeddings... (${progress}%)`;
+      case "vector_store":
+        return `Indexing chunks in vector storage... (${progress}%)`;
+      case "completed":
+        return `Indexing complete! (${progress}%)`;
+      default:
+        return `Processing document... (${progress}%)`;
+    }
+  };
+
+  /**
+   * BACKEND INTEGRATION: Upload Document File & Status Polling Loop
+   * API Endpoints:
+   * 1. POST http://127.0.0.1:8000/api/v1/documents/upload (Uploads document, returns document_id)
+   * 2. GET http://127.0.0.1:8000/api/v1/documents/status/{document_id} (Fetches progress & processing status)
    */
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
@@ -118,20 +141,61 @@ function ChatInput() {
     }
 
     setIsUploading(true);
+    setUploadProgress(0); // Reset progress spinner value
+    setUploadStep("document_saved");
     try {
-      // Calling upload-document API in docService.js
-      await uploadDocument(user.id, file);
+      // 1. Submit form payload to upload endpoint
+      const uploadRes = await uploadDocument(user.id, file);
 
-      // Append system message notifying document upload was successful
+      // Extract document UUID
+      const documentId = uploadRes.document_id || uploadRes.id || uploadRes.doc_id || uploadRes.data?.document_id;
+      if (!documentId) {
+        throw new Error("No document ID returned from upload endpoint.");
+      }
+
+      // 2. Poll processing status endpoint
+      const pollStatus = () => {
+        return new Promise((resolve, reject) => {
+          const intervalId = setInterval(async () => {
+            try {
+              const statusRes = await getDocumentStatus(documentId);
+              
+              // Progress values: [20, 40, 70, 90, 100]
+              const progress = statusRes.progress ?? 0;
+              const step = statusRes.current_step || statusRes.currentStep || null;
+              
+              setUploadProgress(progress);
+              setUploadStep(step);
+
+              if (statusRes.status === "completed" || progress >= 100) {
+                clearInterval(intervalId);
+                resolve(statusRes);
+              } else if (statusRes.status === "failed" || statusRes.error_message) {
+                clearInterval(intervalId);
+                reject(new Error(statusRes.error_message || "Document processing failed."));
+              }
+            } catch (err) {
+              clearInterval(intervalId);
+              reject(err);
+            }
+          }, 1500); // Check status every 1.5s
+        });
+      };
+
+      await pollStatus();
+
+      // 3. Append system message notifying document processing was completed
       addMessage(activeConversation.id, {
         id: Date.now(),
         role: "assistant",
-        content: `📁 **Uploaded Document**: "${file.name}" has been processed and added to the context. You can now ask questions about it!`,
+        content: `📁 **Uploaded Document**: "${file.name}" has been processed successfully (100% completed) and added to the context. You can now ask questions about it!`,
       });
     } catch (err) {
       alert(`Upload failed: ${err.message}`);
     } finally {
       setIsUploading(false);
+      setUploadProgress(null);
+      setUploadStep(null);
       // Reset input value to allow selecting same file again
       e.target.value = "";
     }
@@ -153,7 +217,7 @@ function ChatInput() {
               : "border-slate-200 dark:border-zinc-800/80 focus-within:border-brand-500 dark:focus-within:border-brand-500/50 focus-within:ring-4 focus-within:ring-brand-500/10 focus-within:bg-[var(--bg-secondary)] dark:focus-within:bg-zinc-900/60"}
           `}>
             
-            {/* Hidden native file input */}
+            {/* Hidden but interactive native file input */}
             <input
               type="file"
               id="doc-upload-input"
@@ -175,7 +239,7 @@ function ChatInput() {
                 isDisabled 
                   ? "Select a workspace chat to begin writing..." 
                   : isUploading 
-                    ? "Uploading document to workspace..." 
+                    ? getStepDescription(uploadStep, uploadProgress ?? 0)
                     : isGenerating
                       ? "NexusAI is thinking..."
                       : "Message NexusAI Assistant..."
@@ -206,11 +270,16 @@ function ChatInput() {
                   title="Add attachment"
                 >
                   {isUploading ? (
-                    // Small upload spinner
-                    <svg className="animate-spin h-4.5 w-4.5 text-brand-600 dark:text-brand-500" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
+                    // Small progress spinner with percentage text
+                    <div className="relative flex items-center justify-center w-5 h-5">
+                      <svg className="animate-spin absolute inset-0 w-full h-full text-brand-600 dark:text-brand-500" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3.2" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      <span className="text-[7px] font-extrabold text-brand-700 dark:text-brand-400 z-10 select-none">
+                        {uploadProgress ?? 0}%
+                      </span>
+                    </div>
                   ) : (
                     // Clip icon
                     <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">

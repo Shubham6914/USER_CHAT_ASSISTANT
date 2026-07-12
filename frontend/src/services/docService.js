@@ -4,7 +4,7 @@ import api from "./api";
  * =====================================================
  * BACKEND INTEGRATION: Upload Document Endpoint
  * =====================================================
- * API Endpoint: POST http://127.0.0.1:8000/api/v1/auth/upload-document
+ * API Endpoint: POST http://127.0.0.1:8000/api/v1/documents/upload
  * Headers: 
  *   - Content-Type: multipart/form-data
  *   - Authorization: Bearer <access_token> (auto-attached via Axios interceptor)
@@ -18,7 +18,7 @@ export const uploadDocument = async (userId, file) => {
     formData.append("user_id", userId);
     formData.append("file", file);
 
-    const response = await api.post("/api/v1/auth/upload-document", formData, {
+    const response = await api.post("/api/v1/documents/upload", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
@@ -26,6 +26,24 @@ export const uploadDocument = async (userId, file) => {
     return response.data;
   } catch (error) {
     const message = error.response?.data?.detail || error.message || "Failed to upload document";
+    throw new Error(message);
+  }
+};
+
+/**
+ * =====================================================
+ * BACKEND INTEGRATION: Get Document Processing Status
+ * =====================================================
+ * API Endpoint: GET http://127.0.0.1:8000/api/v1/documents/status/{document_id}
+ * Headers: 
+ *   - Authorization: Bearer <access_token> (auto-attached via Axios interceptor)
+ */
+export const getDocumentStatus = async (documentId) => {
+  try {
+    const response = await api.get(`/api/v1/documents/status/${documentId}`);
+    return response.data;
+  } catch (error) {
+    const message = error.response?.data?.detail || error.message || "Failed to fetch document status";
     throw new Error(message);
   }
 };

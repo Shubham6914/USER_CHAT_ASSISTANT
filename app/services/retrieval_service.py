@@ -29,7 +29,7 @@ class RetrievalService:
         index = db_service.get_pinecone_index()  # ✅ GET INDEX
 
         self.vector_store = VectorStoreService(index=index)  # ✅ PASS IT
-        self.embedding_service = EmbeddingService( vector_store=self.vector_store)
+        self.embedding_service = EmbeddingService()
 
 
     def retrieve_similar_chunks(

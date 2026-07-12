@@ -77,6 +77,8 @@ def process_document_pipeline(self, document_id: str):
             current_step=current_step,
             progress=20
         )
+        # update progress in db 
+        db.commit()
 
 
         #  Prepare document dict
@@ -97,6 +99,8 @@ def process_document_pipeline(self, document_id: str):
             current_step=current_step,
             progress=40
         )
+        # update progress in db 
+        db.commit()
 
 
         logger.info(
@@ -133,6 +137,8 @@ def process_document_pipeline(self, document_id: str):
             current_step=current_step,
             progress=70
         )
+        # update progress in db 
+        db.commit()
 
 
         logger.info(
@@ -161,6 +167,8 @@ def process_document_pipeline(self, document_id: str):
             current_step=current_step,
             progress=90
         )
+        # update progress in db 
+        db.commit()
 
 
         logger.info(
@@ -189,6 +197,8 @@ def process_document_pipeline(self, document_id: str):
             current_step=ProcessingStepEnum.COMPLETED,
             progress=100
         )
+        # update progress in db 
+        db.commit()
 
 
         logger.info(

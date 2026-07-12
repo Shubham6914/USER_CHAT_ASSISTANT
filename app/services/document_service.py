@@ -11,6 +11,9 @@ from app.exceptions.document_exceptions import (
 from uuid import UUID
 import uuid
 
+from app.models import UserDocument
+from app.models import ProcessingStatus
+
 class DocumentService:
     """
     Service for handling document-related DB operations,
@@ -162,3 +165,56 @@ class DocumentService:
         except Exception as e:
             self.logger.error(f"Error checking user documents: {str(e)}")
             return False
+        
+
+    def get_doc_processing_status(
+        self,
+        db,
+        document_id: str
+    ):
+        """
+        Fetch the processing status of a document.
+
+        Args:
+            db: SQLAlchemy database session.
+            document_id: UUID of the document.
+
+        Returns:
+            ProcessingStatus: ORM object representing the document's processing status.
+
+        Raises:
+            ValueError: If the document or its processing status does not exist.
+        """
+
+        try:
+            document = (
+                db.query(UserDocument)
+                .filter(
+                    UserDocument.doc_id == document_id
+                )
+                .first()
+            )
+
+            print(f"document status------->{document}")
+
+            if document is None:
+                raise ValueError(
+                    f"Document not found: {document_id}"
+                )
+
+            if document.processing_status is None:
+                raise ValueError(
+                    f"Processing status not found for document: {document_id}"
+                )
+
+            self.logger.info(
+                f"Fetched processing status for document: {document_id}"
+            )
+
+            return document.processing_status
+
+        except Exception as e:
+            self.logger.error(
+                f"Failed to fetch processing status for document {document_id}: {str(e)}"
+            )
+            raise
