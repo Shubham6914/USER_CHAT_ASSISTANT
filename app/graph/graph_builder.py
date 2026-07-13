@@ -14,6 +14,7 @@ def build_graph():
     # Nodes
     graph.add_node("analyze_node", nodes.analyze_node)
     graph.add_node("rag_node", nodes.rag_node)
+    graph.add_node("tool_selector_node", nodes.tool_selector_node)
     graph.add_node("tool_node", nodes.tool_node)
     graph.add_node("direct_node", nodes.direct_node)
 
@@ -26,10 +27,13 @@ def build_graph():
         route_query,
         {
             "rag_node": "rag_node",
-            "tool_node": "tool_node",
+            "tool_selector_node": "tool_selector_node",
             "direct_node": "direct_node",
         },
     )
+
+    # Tool selection -> execution
+    graph.add_edge("tool_selector_node", "tool_node")
 
     # End after planning
     graph.add_edge("rag_node", END)

@@ -5,6 +5,7 @@ from app.services.retrieval_service import RetrievalService
 from app.services.response_service import ResponseService
 from app.services.tool_service import ToolService
 from app.services.prompt_service import ANALYZE_QUERY_PROMPT, LLM_INSTRUCTIONS
+from app.services.tool_selector_service import ToolSelectorService
 
 import json
 
@@ -13,6 +14,7 @@ class GraphNodes:
         self.retrieval_service = RetrievalService()
         self.response_service = ResponseService()
         self.tool_service = ToolService(self.retrieval_service)
+        self.tool_selector = ToolSelectorService()
 
         self.llm = self.response_service.llm_client
 
@@ -86,5 +88,25 @@ class GraphNodes:
     def direct_node(self, state: AgentState) -> AgentState:
         # no-op node
         return {}
+    # ---------------------------
+    # 4. Tool Selector Node
+    # ---------------------------
+
+    def tool_selector_node(
+        self,
+        state: AgentState
+    ):
+
+        result = self.tool_selector.select_tool(
+            query=state["query"],
+            user_id=state.get("user_id")
+        )
+
+
+        return {
+            "selected_tool": result["tool"],
+            "tool_params": result["parameters"]
+        }
+
 
     

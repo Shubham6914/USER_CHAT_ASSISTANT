@@ -123,6 +123,12 @@ function ChatMessage({ role, content, sources }) {
           .replace(/</g, "&lt;")
           .replace(/>/g, "&gt;");
 
+        // Markdown Links: [text](url)
+        html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-brand-600 dark:text-brand-400 hover:underline font-semibold">$1</a>');
+
+        // Raw/Plain URLs: https://...
+        html = html.replace(/(?<!href=")(?<!src=")(?<!">)\bhttps?:\/\/[a-zA-Z0-9][-a-zA-Z0-9@:%_\+.~#?&//=]*[a-zA-Z0-9@:%_\+~#?&//=]/g, '<a href="$&" target="_blank" rel="noopener noreferrer" class="text-brand-600 dark:text-brand-400 hover:underline font-semibold">$&</a>');
+
         // Bold: **text**
         html = html.replace(/\*\*([\s\S]+?)\*\*/g, '<strong class="font-bold text-slate-900 dark:text-white">$1</strong>');
 
@@ -141,9 +147,31 @@ function ChatMessage({ role, content, sources }) {
 
         // Handle empty lines (paragraph breaks)
         if (!trimmed) {
-          flushList(`list-flush-${index}-${i}`);
+          // Lookahead: check if there is a next non-empty line that continues the current list type
+          let continuesList = false;
+          if (listType) {
+            for (let j = i + 1; j < lines.length; j++) {
+              const nextTrimmed = lines[j].trim();
+              if (nextTrimmed) {
+                if (listType === "ul" && (nextTrimmed.startsWith("* ") || nextTrimmed.startsWith("- "))) {
+                  continuesList = true;
+                } else if (listType === "ol" && /^\d+\.\s+/.test(nextTrimmed)) {
+                  continuesList = true;
+                }
+                break;
+              }
+            }
+          }
+
+          if (!continuesList) {
+            flushList(`list-flush-${index}-${i}`);
+          }
+          
           flushParagraph(`p-flush-${index}-${i}`);
-          renderedElements.push(<div key={`empty-${index}-${i}`} className="h-3" />);
+          
+          if (!continuesList) {
+            renderedElements.push(<div key={`empty-${index}-${i}`} className="h-3" />);
+          }
           continue;
         }
 
@@ -280,41 +308,76 @@ function ChatMessage({ role, content, sources }) {
             <div className="flex flex-wrap gap-2">
               {sources.map((src, sIdx) => {
                 const pageNum = src.page_number || src.metadata?.page_number;
-                const textSnippet = src.text || "";
+                const textSnippet = src.text || src.content || src.metadata?.text || "";
+                const url = src.url || src.metadata?.url;
+                const title = src.title || src.metadata?.title;
+                
+                const getHostname = (urlStr) => {
+                  try {
+                    return new URL(urlStr).hostname.replace("www.", "");
+                  } catch (e) {
+                    return urlStr;
+                  }
+                };
+
+                let sourceLabel = `Source ${sIdx + 1}`;
+                if (pageNum) {
+                  sourceLabel = `Page ${pageNum}`;
+                } else if (url) {
+                  const domain = getHostname(url);
+                  sourceLabel = title
+                    ? `${title.length > 22 ? title.slice(0, 22) + "..." : title} (${domain})`
+                    : domain;
+                }
+
+                const Tag = url ? "a" : "div";
+                const tagProps = url
+                  ? { href: url, target: "_blank", rel: "noopener noreferrer" }
+                  : {};
+
                 return (
-                  <div
+                  <Tag
                     key={sIdx}
+                    {...tagProps}
                     className="
                       group/src relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl border
                       bg-slate-100/50 dark:bg-zinc-900/40 border-slate-200/60 dark:border-zinc-800/80
                       text-[11px] font-semibold text-slate-600 dark:text-zinc-400 hover:text-brand-600 dark:hover:text-brand-400
                       hover:border-brand-500/40 dark:hover:border-brand-500/30 hover:bg-white dark:hover:bg-zinc-900
-                      transition-all duration-200 cursor-pointer shadow-sm
+                      transition-all duration-200 cursor-pointer shadow-sm no-underline
                     "
                   >
-                    <span className="w-1.5 h-1.5 rounded-full bg-brand-500/80 dark:bg-brand-500/70" />
-                    <span>
-                      {pageNum ? `Page ${pageNum}` : `Source ${sIdx + 1}`}
-                    </span>
+                    {url ? (
+                      <svg className="w-3 h-3 text-slate-400 dark:text-zinc-500 group-hover/src:text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    ) : (
+                      <span className="w-1.5 h-1.5 rounded-full bg-brand-500/80 dark:bg-brand-500/70" />
+                    )}
+                    <span>{sourceLabel}</span>
                     
                     {/* Floating Hover Card (Perplexity-style) */}
-                    <div className="
-                      absolute bottom-full left-0 mb-2.5 hidden group-hover/src:block z-50
-                      w-72 max-h-48 overflow-y-auto p-3.5 rounded-2xl border
-                      bg-slate-900/95 dark:bg-zinc-950/95 text-white shadow-xl
-                      border-slate-850 dark:border-zinc-800 backdrop-blur-sm
-                      transition-all duration-200 pointer-events-auto select-text animate-fade-in
-                      scrollbar-thin scrollbar-thumb-zinc-700
-                    ">
+                    <div 
+                      onClick={(e) => e.stopPropagation()}
+                      className="
+                        absolute bottom-full left-0 mb-2.5 hidden group-hover/src:block z-50
+                        w-72 max-h-48 overflow-y-auto p-3.5 rounded-2xl border
+                        bg-slate-900/95 dark:bg-zinc-950/95 text-white shadow-xl
+                        border-slate-850 dark:border-zinc-800 backdrop-blur-sm
+                        transition-all duration-200 pointer-events-auto select-text animate-fade-in
+                        scrollbar-thin scrollbar-thumb-zinc-700
+                      "
+                    >
                       <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-slate-800 dark:border-zinc-850 text-[10px] text-zinc-400 uppercase font-bold tracking-wider">
-                        <span>Citation Content</span>
+                        <span>{url ? "Web Source Snippet" : "Citation Content"}</span>
                         {pageNum && <span className="text-brand-400">Page {pageNum}</span>}
+                        {url && <span className="text-brand-400">{getHostname(url)}</span>}
                       </div>
                       <p className="text-[11px] leading-relaxed text-zinc-200 font-normal break-words whitespace-pre-line">
                         {textSnippet}
                       </p>
                     </div>
-                  </div>
+                  </Tag>
                 );
               })}
             </div>

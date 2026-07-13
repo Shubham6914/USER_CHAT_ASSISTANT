@@ -7,6 +7,9 @@ from app.core.database_service import database_service
 from app.api.routes.auth_routes import router as auth_router
 from app.api.routes.document_routes import router as document_router
 from app.services.logger_service import get_logger
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logger = get_logger(__name__)
 

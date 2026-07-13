@@ -115,18 +115,42 @@ export const queryAssistantStream = async (userId, query, onChunk, onSources, on
         try {
           if (dataStr.includes("{") && dataStr.includes("}")) {
             const parsed = JSON.parse(dataStr);
-            if (parsed.type === "sources" && parsed.sources) {
-              if (onSources) onSources(parsed.sources);
-              continue;
-            } else if (parsed.retrieved_docs || parsed.sources) {
-              if (onSources) onSources(parsed.retrieved_docs || parsed.sources);
-              continue;
-            } else {
-              const textChunk = parsed.response || parsed.text || parsed.answer || parsed.delta;
-              if (textChunk !== undefined) {
-                onChunk(textChunk);
-                continue;
+            
+            // Extract sources from multiple potential backend payload structures
+            let extractedSources = 
+              (parsed.type === "sources" && parsed.sources) ||
+              parsed.retrieved_docs ||
+              parsed.sources;
+
+            if (!extractedSources) {
+              const toolRes = parsed.tool_response?.data || parsed.tool_response;
+              if (toolRes) {
+                if (Array.isArray(toolRes.results?.results)) {
+                  extractedSources = toolRes.results.results;
+                } else if (Array.isArray(toolRes.results)) {
+                  extractedSources = toolRes.results;
+                }
               }
+            }
+
+            if (!extractedSources) {
+              if (Array.isArray(parsed.results?.results)) {
+                extractedSources = parsed.results.results;
+              } else if (Array.isArray(parsed.results)) {
+                extractedSources = parsed.results;
+              }
+            }
+
+            if (extractedSources && Array.isArray(extractedSources)) {
+              if (onSources) onSources(extractedSources);
+              continue;
+            }
+
+            // Otherwise check for text chunk
+            const textChunk = parsed.response || parsed.text || parsed.answer || parsed.delta;
+            if (textChunk !== undefined) {
+              onChunk(textChunk);
+              continue;
             }
           }
         } catch (e) {

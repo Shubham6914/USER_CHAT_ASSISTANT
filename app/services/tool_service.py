@@ -3,7 +3,7 @@ from app.services.logger_service import get_logger
 from app.services.retrieval_service import RetrievalService  
 from app.services.prompt_service import LLM_INSTRUCTIONS
 from app.core.llm_client import llm_client
-
+from langchain_tavily import TavilySearch
 
 
 
@@ -31,6 +31,10 @@ class ToolService:
         self.logger = get_logger("tool_service")
 
         self.retrieval_service = retrieval_service
+        self.tavily_search = TavilySearch(
+            max_results=3,
+            topic="general"
+        )
 
         # Tool registry
         self.tools: Dict[str, Callable] = {}
@@ -110,15 +114,18 @@ class ToolService:
 
     def _web_search_tool(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Web search tool
+        Perform a web search using the Tavily Search API.
 
-        Expected Input:
+        Input:
             {
                 "query": "latest AI news"
             }
 
-        NOTE:
-        Replace with real API (SerpAPI, Tavily, etc.)
+        Returns:
+            {
+                "query": "latest AI news",
+                "results": [...]
+            }
         """
         self.logger.debug(f"[Tool:web_search] Params: {params}")
 
@@ -127,16 +134,17 @@ class ToolService:
         if not query:
             raise ValueError("Missing 'query' parameter")
 
-        # 🔹 Stub response (replace later)
-        results = [
-            {"title": "Example Result 1", "snippet": "This is a sample result"},
-            {"title": "Example Result 2", "snippet": "Another sample result"}
-        ]
+        try:
+            results = self.tavily_search.invoke(query)
 
-        return {
-            "query": query,
-            "results": results
-        }
+            return {
+                "query": query,
+                "results": results
+            }
+
+        except Exception as e:
+            self.logger.error(f"[Tool:web_search] Failed: {str(e)}")
+            raise
 
     # ------------------------------------------------------------------
     # TOOL 2: CALCULATOR (SAFE)

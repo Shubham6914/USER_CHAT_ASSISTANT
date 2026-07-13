@@ -13,43 +13,6 @@ class StreamingService:
         self.response_service = ResponseService()
 
 
-    # def stream_response(self, state):
-
-    #     intent = state.get("intent")
-
-    #     query = state.get("query")
-
-
-    #     if intent == "rag":
-
-    #         docs = state.get("retrieved_docs", [])
-
-    #         context = "\n".join(
-    #             [str(doc) for doc in docs]
-    #         )
-
-    #         yield from self.response_service.generate_rag_response(
-    #             query=query,
-    #             context=context,
-    #             system_instructions =LLM_INSTRUCTIONS
-    #         )
-
-
-    #     elif intent == "tool":
-
-    #         yield from self.response_service.generate_tool_response(
-    #             query=query,
-    #             tool_result=state.get("tool_response")
-    #         )
-
-
-    #     else:
-
-    #         yield from self.response_service.generate_direct_response(
-    #             query=query,
-    #             system_instructions =LLM_INSTRUCTIONS
-    #         )
-
     def stream_response(self, state):
         intent = state.get("intent")
         query = state.get("query")
@@ -80,8 +43,33 @@ class StreamingService:
             )
 
         elif intent == "tool":
+            tool_res = state.get("tool_response", {})
+            results = None
+            if isinstance(tool_res, dict):
+                data = tool_res.get("data", {})
+                if isinstance(data, dict):
+                    res_obj = data.get("results")
+                    if isinstance(res_obj, dict):
+                        results = res_obj.get("results")
+                    elif isinstance(res_obj, list):
+                        results = res_obj
+                if not results:
+                    results = tool_res.get("results")
+            
+            if results and isinstance(results, list):
+                import json
+                sources_data = []
+                for res in results:
+                    sources_data.append({
+                        "url": res.get("url"),
+                        "title": res.get("title"),
+                        "content": res.get("content", "")[:400]
+                    })
+                yield "data: " + json.dumps({"type": "sources", "sources": sources_data}) + "\n\n"
+
             yield from self.response_service.generate_tool_response(
                 query=query,
+                tool_name=state.get("selected_tool"),
                 tool_result=state.get("tool_response")
             )
 
