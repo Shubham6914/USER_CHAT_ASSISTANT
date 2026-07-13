@@ -1,3 +1,4 @@
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../components/common/Button";
 import useAuth from "../hooks/useAuth";
@@ -5,7 +6,40 @@ import ThemeToggle from "../components/common/ThemeToggle";
 
 function Settings() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, fetchMe } = useAuth();
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState(null);
+
+  const hasFetched = useRef(false);
+
+  useEffect(() => {
+    if (hasFetched.current) return;
+    hasFetched.current = true;
+
+    let isMounted = true;
+    const loadProfile = async () => {
+      if (!fetchMe) return;
+      setProfileLoading(true);
+      setProfileError(null);
+      try {
+        await fetchMe();
+      } catch (err) {
+        if (isMounted) {
+          setProfileError(err.message || "Failed to load user info");
+          hasFetched.current = false;
+        }
+      } finally {
+        if (isMounted) {
+          setProfileLoading(false);
+        }
+      }
+    };
+
+    loadProfile();
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchMe]);
 
   const handleLogout = () => {
     logout();
@@ -37,9 +71,42 @@ function Settings() {
         <div className="space-y-6">
           {/* Profile Card */}
           <div className="bg-[var(--bg-secondary)] dark:bg-zinc-900 rounded-2xl border border-slate-200/60 dark:border-zinc-800/80 p-6 shadow-sm shadow-slate-100/50 dark:shadow-none">
-            <h3 className="text-sm font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mb-4">
-              Profile details
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
+                Profile details
+              </h3>
+              {profileLoading ? (
+                <span className="text-[10px] text-slate-400 dark:text-zinc-500 flex items-center gap-1 animate-pulse">
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-500 animate-ping" />
+                  Syncing with server...
+                </span>
+              ) : profileError ? (
+                <button
+                  onClick={() => {
+                    const retry = async () => {
+                      setProfileLoading(true);
+                      setProfileError(null);
+                      try {
+                        await fetchMe();
+                      } catch (err) {
+                        setProfileError(err.message || "Failed to load user info");
+                      } finally {
+                        setProfileLoading(false);
+                      }
+                    };
+                    retry();
+                  }}
+                  className="text-[10px] text-red-500 dark:text-red-400 hover:underline cursor-pointer flex items-center gap-1 border-0 bg-transparent p-0"
+                  title={profileError}
+                >
+                  ⚠️ Sync failed. Click to retry
+                </button>
+              ) : (
+                <span className="text-[10px] text-emerald-500 dark:text-emerald-400 flex items-center gap-1">
+                  ✓ Synced
+                </span>
+              )}
+            </div>
             
             <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
               {/* User Avatar Placeholder */}
@@ -56,8 +123,15 @@ function Settings() {
                   </svg>
                   {user?.email}
                 </p>
-                <div className="inline-flex items-center gap-1 px-2.5 py-0.5 mt-2 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30">
-                  Active Session
+                <div className="flex flex-wrap gap-2 mt-2 justify-center sm:justify-start">
+                  <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30">
+                    Active Session
+                  </div>
+                  {user?.id && (
+                    <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30">
+                      ID: {user.id}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

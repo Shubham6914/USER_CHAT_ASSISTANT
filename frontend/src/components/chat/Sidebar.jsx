@@ -170,20 +170,24 @@ function Sidebar({ isOpen, onClose }) {
         {/* User Profile Section at Bottom */}
         <div className="p-4 border-t border-slate-100 dark:border-zinc-900/50 bg-[var(--bg-primary)]/50 dark:bg-zinc-950/20">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5 min-w-0">
+            <Link
+              to="/settings"
+              className="flex items-center gap-2.5 min-w-0 hover:bg-slate-100 dark:hover:bg-zinc-800/60 p-1.5 -m-1.5 rounded-xl transition-all duration-200 cursor-pointer group"
+              title="View Profile"
+            >
               {/* Profile Avatar */}
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 text-white font-bold text-sm flex items-center justify-center shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 text-white font-bold text-sm flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200">
                 {user?.name ? user.name.slice(0, 2).toUpperCase() : "US"}
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-bold text-slate-800 dark:text-zinc-150 truncate">
+                <p className="text-xs font-bold text-slate-800 dark:text-zinc-150 truncate group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
                   {user?.name || "GenAI User"}
                 </p>
                 <p className="text-[10px] text-slate-400 dark:text-zinc-500 truncate">
                   {user?.email}
                 </p>
               </div>
-            </div>
+            </Link>
 
             {/* Profile Settings Controls */}
             <div className="flex items-center gap-1">

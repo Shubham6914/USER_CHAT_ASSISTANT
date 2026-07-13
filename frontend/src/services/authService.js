@@ -99,3 +99,26 @@ export const refreshToken = async (refreshTokenVal) => {
     throw new Error(message);
   }
 };
+
+/**
+ * =====================================================
+ * BACKEND INTEGRATION: Get Current User Info (Me)
+ * =====================================================
+ * API Endpoint: GET http://127.0.0.1:8000/api/v1/auth/me
+ * Headers:
+ *   Authorization: Bearer <token>
+ */
+export const getMe = async (token) => {
+  try {
+    const response = await api.get("/api/v1/auth/me", {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }
+    });
+    return response.data;
+  } catch (error) {
+    const message = error.response?.data?.detail || error.message || "Failed to fetch user info";
+    throw new Error(message);
+  }
+};
+

@@ -12,9 +12,9 @@
 // Context lets us access the user globally.
 
 
-import { createContext, useEffect, useState } from "react";
+import { createContext, useEffect, useState, useCallback } from "react";
 
-import { signup, signin, verifyToken, refreshToken } from "../services/authService";
+import { signup, signin, verifyToken, refreshToken, getMe } from "../services/authService";
 import {
   saveUser,
   getUser,
@@ -159,6 +159,32 @@ function AuthProvider({ children }) {
     setUser(null);
   };
 
+  /**
+   * Fetch current user profile details from backend and sync state
+   */
+  const fetchMe = useCallback(async () => {
+    const storedUser = getUser();
+    if (!storedUser || !storedUser.token) return null;
+    try {
+      const data = await getMe(storedUser.token);
+      if (data) {
+        const updatedUser = {
+          ...storedUser,
+          id: data.user_id || storedUser.id,
+          name: data.user_name || storedUser.name,
+          email: data.user_email || storedUser.email,
+        };
+        setUser(updatedUser);
+        saveUser(updatedUser);
+        return updatedUser;
+      }
+      return null;
+    } catch (err) {
+      console.error("Failed to fetch user details from /api/v1/auth/me", err);
+      throw err;
+    }
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -167,6 +193,7 @@ function AuthProvider({ children }) {
         login,
         register,
         logout,
+        fetchMe,
       }}
     >
       {children}
