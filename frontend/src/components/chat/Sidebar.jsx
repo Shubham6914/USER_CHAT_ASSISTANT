@@ -63,7 +63,7 @@ function Sidebar({ isOpen, onClose }) {
       >
         {/* Header Section */}
         <div className="p-4 border-b border-slate-100 dark:border-zinc-900/50 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
+          <Link to="/" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
             <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-brand-600 text-white shadow-md shadow-brand-500/20">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -77,7 +77,7 @@ function Sidebar({ isOpen, onClose }) {
                 Assistant Pro
               </p>
             </div>
-          </div>
+          </Link>
 
           {/* Close Menu Button on Mobile */}
           <button
@@ -92,7 +92,26 @@ function Sidebar({ isOpen, onClose }) {
         </div>
 
         {/* Sidebar Controls */}
-        <div className="p-4 flex flex-col gap-3">
+        <div className="p-4 flex flex-col gap-2.5">
+          {/* Back to Portal Button */}
+          <Link
+            to="/"
+            className="
+              flex items-center justify-center gap-2
+              w-full rounded-xl border border-slate-200 dark:border-zinc-800/80
+              hover:border-brand-500 dark:hover:border-brand-500/50
+              bg-[var(--bg-primary)]/50 hover:bg-slate-100 dark:bg-zinc-900/20 dark:hover:bg-zinc-800/60
+              text-slate-700 dark:text-zinc-200 hover:text-brand-600 dark:hover:text-brand-400
+              px-4 py-2.5 text-sm font-semibold
+              transition-all duration-200 cursor-pointer hover:scale-[1.01] active:scale-[0.99]
+            "
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
+            <span>Back to Portal</span>
+          </Link>
+
           {/* New Chat Button */}
           <button
             onClick={handleNewChatClick}
