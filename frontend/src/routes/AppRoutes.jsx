@@ -4,6 +4,10 @@ import Login from "../pages/Login";
 import Register from "../pages/Register";
 import Chat from "../pages/Chat";
 import Settings from "../pages/Settings";
+import Home from "../pages/Home";
+import Study from "../pages/Study";
+import MockInterview from "../pages/MockInterview";
+import ResumeReview from "../pages/ResumeReview";
 
 import ProtectedRoute from "../components/layout/ProtectedRoute";
 
@@ -12,7 +16,14 @@ function AppRoutes() {
     <BrowserRouter>
       <Routes>
 
-        <Route path="/" element={<Login />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <Home />
+            </ProtectedRoute>
+          }
+        />
 
         <Route path="/login" element={<Login />} />
 
@@ -23,6 +34,33 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <Chat />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/study"
+          element={
+            <ProtectedRoute>
+              <Study />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/mock-interview"
+          element={
+            <ProtectedRoute>
+              <MockInterview />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/resume-review"
+          element={
+            <ProtectedRoute>
+              <ResumeReview />
             </ProtectedRoute>
           }
         />

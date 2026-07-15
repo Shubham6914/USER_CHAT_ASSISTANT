@@ -23,7 +23,7 @@ function Login() {
       }
 
       await login(email, password);
-      navigate("/chat");
+      navigate("/");
     } catch (err) {
       setError(err.message);
     } finally {
