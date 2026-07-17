@@ -32,7 +32,7 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 # import ALL models so Alembic can detect them
 from app.models.base import Base
-from app.models import user_model, user_chat_model, chat_message_model, user_document_model, refresh_token_model,processing_status_model
+from app.models import user_model, user_chat_model, chat_message_model, user_document_model, refresh_token_model,processing_status_model,conversation_summary_model
 
 target_metadata = Base.metadata
 
