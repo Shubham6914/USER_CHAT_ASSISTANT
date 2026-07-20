@@ -38,81 +38,53 @@ NexusAI is a powerful, multi-tenant Generative AI Assistant featuring Document R
 
 ```text
 NexusAI/
-├── app/                      # Backend application source code
-│   ├── api/                  # API routes, middlewares, and dependencies
-│   ├── core/                 # DB, settings, LLM singletons
-│   ├── graph/                # LangGraph nodes, routing, state
-│   ├── models/               # SQLAlchemy DB models
-│   ├── schemas/              # Pydantic schemas
-│   ├── services/             # Core services (RAG, upload, tools)
-│   └── workers/              # Celery workers & tasks
-├── frontend/                 # React SPA (Vite + Tailwind)
-├── alembic/                  # Database migration tracks
-├── docker-compose.yml        # Docker configuration for Redis
-└── .env                      # Global environment variables
-```
-
----
-
-## Configuration Settings
-
-Configure your environment variables in a `.env` file at the root directory:
-
-```env
-# PostgreSQL
-DATABASE_URL=postgresql+psycopg2://postgres:postgres123@localhost:5432/assistant_db
-
-# Pinecone
-PINECONE_API_KEY=your_pinecone_api_key
-PINECONE_INDEX=text-document
-
-# JWT
-SECRET_KEY=your_jwt_secret_key
-ACCESS_TOKEN_EXPIRE_MINUTES=15
-
-# OpenAI & Tavily
-OPENAI_API_KEY=your_openai_api_key
-TAVILY_API_KEY=your_tavily_api_key
-
-# Redis
-REDIS_URL=redis://127.0.0.1:6379/0
+├── backend/                  # FastAPI backend service
+│   ├── app/                  # Application source code (api, core, graph, models, schemas, services, workers)
+│   ├── alembic/              # Database migration tracks
+│   ├── alembic.ini           # Alembic configuration
+│   ├── PLANS/                # Backend architecture design documents
+│   ├── test/                 # Test suites
+│   ├── uploads/              # Document upload storage
+│   ├── .env                  # Environment configuration
+│   ├── Dockerfile            # Backend Docker setup
+│   ├── docker-compose.yml    # Docker configuration for Redis
+│   └── requirements.txt      # Python dependencies
+└── frontend/                 # React SPA (Vite + Tailwind CSS)
 ```
 
 ---
 
 ## Setup & Running Guide
 
-### 1. Start Redis (Docker)
-Ensure Docker is installed and running, then start the Redis instance using Docker Compose:
-```bash
-docker compose up -d
-```
-This spins up a background Redis container bound to `6379:6379`.
-
-### 2. Backend Setup
-1. **Navigate to the root directory** and activate a virtual environment:
+### 1. Backend Setup
+1. **Navigate to the `backend` directory**:
+   ```bash
+   cd backend
+   ```
+2. **Start Redis container (Docker)**:
+   ```bash
+   docker compose up -d
+   ```
+3. **Activate virtual environment & install dependencies**:
    ```bash
    python -m venv venv
-   source venv/Scripts/activate  # On Windows (PowerShell): venv\Scripts\Activate.ps1
-   ```
-2. **Install backend dependencies**:
-   ```bash
+   source venv/Scripts/activate  # On Windows (PowerShell): ..\venv\Scripts\Activate.ps1
    pip install -r requirements.txt
    ```
-3. **Run database migrations**:
+4. **Run database migrations**:
    ```bash
    alembic upgrade head
    ```
-4. **Start the FastAPI application**:
+5. **Start the FastAPI application**:
    ```bash
    uvicorn app.main:app --reload --port 8000
    ```
-5. **Start Celery background worker**:
+6. **Start Celery background worker**:
    ```bash
-   celery -A app.workers.celery_app.celery worker --loglevel=info -P threads
+   celery -A app.workers.celery_app worker --loglevel=info -P threads
    ```
 
-### 3. Frontend Setup
+### 2. Frontend Setup
 1. **Navigate to the frontend directory**:
    ```bash
    cd frontend
