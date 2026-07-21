@@ -1,5 +1,5 @@
 from typing import List, Dict
-from openai import OpenAI
+from openai import AsyncOpenAI
 from app.services.logger_service import get_logger
 
 from app.core.config import settings
@@ -24,9 +24,9 @@ class EmbeddingService:
         self.logger = get_logger("embedding_service")
         self.batch_size = settings.EMBEDDING_BATCH_SIZE
         self.model = settings.EMBEDDING_MODEL
-        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
-    def process_chunks(self, chunks: List[Dict]) -> List[Dict]:
+    async def process_chunks(self, chunks: List[Dict]) -> List[Dict]:
         """
         Generate embeddings and create vector payload.
 
@@ -77,7 +77,7 @@ class EmbeddingService:
 
 
                 # Generate embeddings
-                embeddings = self.generate_embeddings(
+                embeddings = await self.generate_embeddings(
                     texts
                 )
 
@@ -108,12 +108,9 @@ class EmbeddingService:
 
             raise
 
-    from openai import OpenAI
-
-
-    def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
+    async def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
         """
-        Generate embeddings for a batch of text inputs using OpenAI.
+        Generate embeddings for a batch of text inputs using OpenAI asynchronously.
 
         Args:
             texts (List[str]): List of text strings
@@ -127,11 +124,9 @@ class EmbeddingService:
             return []
 
         try:
-            # Initialize OpenAI client (can be moved to __init__ later)
-
             self.logger.debug(f"Generating embeddings for batch of size {len(texts)}")
 
-            response = self.client.embeddings.create(
+            response = await self.client.embeddings.create(
                 model=self.model,
                 input=texts
             )

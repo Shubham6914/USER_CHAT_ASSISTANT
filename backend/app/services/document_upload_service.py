@@ -10,6 +10,8 @@ from app.exceptions.document_exceptions import (
     FileSaveException,
     DatabaseException,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
+import asyncio
 
 from app.core.config import settings
 from app.services.document_service import DocumentService
@@ -29,14 +31,14 @@ class DocumentUploadService:
     ALLOWED_TYPES = settings.ALLOWED_TYPES
     MAX_FILE_SIZE = settings.MAX_FILE_SIZE
 
-    def __init__(self, db_session, storage_provider):
+    def __init__(self, db_session: AsyncSession, storage_provider):
         self.db = db_session
         self.storage = storage_provider
         self.logger = get_logger(__name__)
         self.document = DocumentService()
 
     # 🔹 MAIN METHOD
-    def upload_document(self, user_id: UUID, file: UploadFile):
+    async def upload_document(self, user_id: UUID, file: UploadFile):
         file_path = None
 
         try:
@@ -50,11 +52,11 @@ class DocumentUploadService:
             self.logger.info(f"Generated file name: {file_name}, file path: {file_path}")
 
             # 3. Save file
-            saved_path = self.save_file(file, file_path)
+            saved_path = await self.save_file(file, file_path)
             self.logger.info(f"File saved at: {saved_path}")
 
             # 4. Create DB entry
-            document = self.document.create_document(
+            document = await self.document.create_document(
                 self.db,
                 user_id=user_id,
                 file_name=file_name,
@@ -63,13 +65,13 @@ class DocumentUploadService:
 
             # create processing status of document in processing table 
 
-            self.document.create_processing_status(
+            await self.document.create_processing_status(
                 self.db,
                 document.doc_id
             )
 
             # 5. Commit
-            self.db.commit()
+            await self.db.commit()
 
             self.logger.info("Document uploaded successfully")
 
@@ -88,10 +90,10 @@ class DocumentUploadService:
         except Exception as e:
             self.logger.error(f"Upload failed: {str(e)}")
 
-            self.db.rollback()
+            await self.db.rollback()
 
             if file_path:
-                self.storage.delete(file_path)
+                await asyncio.to_thread(self.storage.delete, file_path)
 
             raise e
 
@@ -146,11 +148,11 @@ class DocumentUploadService:
         return unique_name, file_path
 
     # 🔹 SAVE FILE
-    def save_file(self, file: UploadFile, file_path: str):
+    async def save_file(self, file: UploadFile, file_path: str):
         self.logger.debug("Saving file via storage provider")
 
         try:
-            return self.storage.save(file, file_path)
+            return await asyncio.to_thread(self.storage.save, file, file_path)
         except Exception as e:
             raise FileSaveException(str(e))
 

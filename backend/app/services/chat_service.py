@@ -2,7 +2,8 @@ from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.exceptions.chat_exceptions import (
     ChatAccessDeniedException,
@@ -31,17 +32,17 @@ class ChatService:
     def __init__(self):
         self.logger = logger
 
-    def create_chat(
+    async def create_chat(
         self,
-        db: Session,
+        db: AsyncSession,
         user_id: UUID,
         title: str = "New Chat"
     ) -> UserChat:
         """
-        Creates a new chat session for a user.
+        Creates a new chat session for a user asynchronously.
 
         Args:
-            db (Session): Database session.
+            db (AsyncSession): Database session.
             user_id (UUID): Owner user ID.
             title (str): Initial chat title (Default: "New Chat").
 
@@ -49,7 +50,7 @@ class ChatService:
             UserChat: Created UserChat ORM model instance.
         """
         try:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
             chat = UserChat(
                 user_id=user_id,
                 chat_title=title,
@@ -62,28 +63,28 @@ class ChatService:
             )
 
             db.add(chat)
-            db.commit()
-            db.refresh(chat)
+            await db.commit()
+            await db.refresh(chat)
 
             self.logger.info(f"Created new chat thread {chat.chat_id} for user {user_id}")
             return chat
 
         except Exception as e:
-            db.rollback()
+            await db.rollback()
             self.logger.error(f"Failed to create chat for user {user_id}: {str(e)}")
             raise
 
-    def get_chat(
+    async def get_chat(
         self,
-        db: Session,
+        db: AsyncSession,
         chat_id: UUID,
         user_id: UUID
     ) -> UserChat:
         """
-        Fetches a chat thread by ID and verifies user ownership.
+        Fetches a chat thread by ID and verifies user ownership asynchronously.
 
         Args:
-            db (Session): Database session.
+            db (AsyncSession): Database session.
             chat_id (UUID): ID of the chat to retrieve.
             user_id (UUID): Authenticated user ID.
 
@@ -94,7 +95,8 @@ class ChatService:
             ChatNotFoundException: If chat record does not exist.
             ChatAccessDeniedException: If chat belongs to a different user.
         """
-        chat = db.query(UserChat).filter(UserChat.chat_id == chat_id).first()
+        result = await db.execute(select(UserChat).filter(UserChat.chat_id == chat_id))
+        chat = result.scalars().first()
 
         if not chat:
             self.logger.warning(f"Chat session {chat_id} not found")
@@ -106,17 +108,17 @@ class ChatService:
 
         return chat
 
-    def list_user_chats(
+    async def list_user_chats(
         self,
-        db: Session,
+        db: AsyncSession,
         user_id: UUID,
         include_archived: bool = False
     ) -> List[UserChat]:
         """
-        Lists all chat sessions owned by a user, ordered by last message timestamp descending.
+        Lists all chat sessions owned by a user, ordered by last message timestamp descending asynchronously.
 
         Args:
-            db (Session): Database session.
+            db (AsyncSession): Database session.
             user_id (UUID): Owner user ID.
             include_archived (bool): Whether to include soft-deleted/archived chats.
 
@@ -124,12 +126,14 @@ class ChatService:
             List[UserChat]: List of user chat session records sorted for sidebar display.
         """
         try:
-            query = db.query(UserChat).filter(UserChat.user_id == user_id)
+            stmt = select(UserChat).filter(UserChat.user_id == user_id)
 
             if not include_archived:
-                query = query.filter(UserChat.is_archived == False)
+                stmt = stmt.filter(UserChat.is_archived == False)
 
-            chats = query.order_by(UserChat.last_message_at.desc()).all()
+            stmt = stmt.order_by(UserChat.last_message_at.desc())
+            result = await db.execute(stmt)
+            chats = list(result.scalars().all())
             self.logger.debug(f"Retrieved {len(chats)} chats for user {user_id}")
             return chats
 
@@ -137,19 +141,19 @@ class ChatService:
             self.logger.error(f"Failed to list chats for user {user_id}: {str(e)}")
             raise
 
-    def update_chat_title(
+    async def update_chat_title(
         self,
-        db: Session,
+        db: AsyncSession,
         chat_id: UUID,
         user_id: UUID,
         title: str,
         status: TitleStatusEnum = TitleStatusEnum.CUSTOM
     ) -> UserChat:
         """
-        Updates the title and title generation status of a chat session.
+        Updates the title and title generation status of a chat session asynchronously.
 
         Args:
-            db (Session): Database session.
+            db (AsyncSession): Database session.
             chat_id (UUID): Chat session ID.
             user_id (UUID): Owner user ID.
             title (str): New title text.
@@ -158,110 +162,111 @@ class ChatService:
         Returns:
             UserChat: Updated UserChat instance.
         """
-        chat = self.get_chat(db, chat_id, user_id)
+        chat = await self.get_chat(db, chat_id, user_id)
 
         try:
             chat.chat_title = title  # type: ignore
             chat.title_status = status  # type: ignore
-            chat.updated_at = datetime.now(timezone.utc)  # type: ignore
+            chat.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)  # type: ignore
 
-            db.commit()
-            db.refresh(chat)
+            await db.commit()
+            await db.refresh(chat)
 
             self.logger.info(f"Updated title for chat {chat_id} to '{title}' (status={status})")
             return chat
 
         except Exception as e:
-            db.rollback()
+            await db.rollback()
             self.logger.error(f"Failed to update chat title for {chat_id}: {str(e)}")
             raise
 
-    def touch_chat(self, db: Session, chat_id: UUID) -> None:
+    async def touch_chat(self, db: AsyncSession, chat_id: UUID) -> None:
         """
-        Updates the last_message_at and updated_at timestamps for a chat session.
+        Updates the last_message_at and updated_at timestamps for a chat session asynchronously.
 
         Args:
-            db (Session): Database session.
+            db (AsyncSession): Database session.
             chat_id (UUID): Chat session ID to update.
         """
         try:
-            chat = db.query(UserChat).filter(UserChat.chat_id == chat_id).first()
+            result = await db.execute(select(UserChat).filter(UserChat.chat_id == chat_id))
+            chat = result.scalars().first()
 
             if chat:
-                now = datetime.now(timezone.utc)
+                now = datetime.now(timezone.utc).replace(tzinfo=None)
                 chat.last_message_at = now  # type: ignore
                 chat.updated_at = now  # type: ignore
-                db.commit()
+                await db.commit()
                 self.logger.debug(f"Touched chat timestamp for {chat_id}")
             else:
                 self.logger.warning(f"Attempted to touch non-existent chat {chat_id}")
 
         except Exception as e:
-            db.rollback()
+            await db.rollback()
             self.logger.error(f"Failed to touch chat timestamp for {chat_id}: {str(e)}")
             raise
 
-    def archive_chat(
+    async def archive_chat(
         self,
-        db: Session,
+        db: AsyncSession,
         chat_id: UUID,
         user_id: UUID
     ) -> UserChat:
         """
-        Archives (soft-deletes) a chat session so it no longer appears in default sidebar queries.
+        Archives (soft-deletes) a chat session asynchronously.
 
         Args:
-            db (Session): Database session.
+            db (AsyncSession): Database session.
             chat_id (UUID): Chat session ID.
             user_id (UUID): Owner user ID.
 
         Returns:
             UserChat: Archived UserChat instance.
         """
-        chat = self.get_chat(db, chat_id, user_id)
+        chat = await self.get_chat(db, chat_id, user_id)
 
         try:
             chat.is_archived = True  # type: ignore
-            chat.updated_at = datetime.now(timezone.utc)  # type: ignore
+            chat.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)  # type: ignore
 
-            db.commit()
-            db.refresh(chat)
+            await db.commit()
+            await db.refresh(chat)
 
             self.logger.info(f"Archived chat session {chat_id} for user {user_id}")
             return chat
 
         except Exception as e:
-            db.rollback()
+            await db.rollback()
             self.logger.error(f"Failed to archive chat session {chat_id}: {str(e)}")
             raise
 
-    def delete_chat(
+    async def delete_chat(
         self,
-        db: Session,
+        db: AsyncSession,
         chat_id: UUID,
         user_id: UUID
     ) -> bool:
         """
-        Permanently deletes a chat session and all associated cascade data.
+        Permanently deletes a chat session and all associated cascade data asynchronously.
 
         Args:
-            db (Session): Database session.
+            db (AsyncSession): Database session.
             chat_id (UUID): Chat session ID.
             user_id (UUID): Owner user ID.
 
         Returns:
             bool: True if deletion succeeded.
         """
-        chat = self.get_chat(db, chat_id, user_id)
+        chat = await self.get_chat(db, chat_id, user_id)
 
         try:
-            db.delete(chat)
-            db.commit()
+            await db.delete(chat)
+            await db.commit()
 
             self.logger.info(f"Permanently deleted chat session {chat_id} for user {user_id}")
             return True
 
         except Exception as e:
-            db.rollback()
+            await db.rollback()
             self.logger.error(f"Failed to delete chat session {chat_id}: {str(e)}")
             raise

@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, UploadFile, File
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import (
     get_db,
@@ -38,10 +38,10 @@ def get_orchestrator():
     "/upload",
     response_model=DocumentUploadResponse
 )
-def upload_document(
+async def upload_document(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     storage=Depends(get_storage_provider),
 ):
 
@@ -50,7 +50,7 @@ def upload_document(
         storage_provider=storage,
     )
 
-    return service.upload_document(
+    return await service.upload_document(
         user_id=current_user.user_id,
         file=file
     )
@@ -59,7 +59,7 @@ def upload_document(
 @router.post("/query")
 async def run_query(
     request: QueryRequest,
-    db=Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     orchestrator: OrchestrationService = Depends(get_orchestrator)
 ):
@@ -84,14 +84,14 @@ async def run_query(
     "/status/{document_id}",
     response_model=ProcessingStatusResponse
 )
-def get_document_status(
+async def get_document_status(
     document_id: UUID,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
 
     document_service = DocumentService()
 
-    status = document_service.get_doc_processing_status(
+    status = await document_service.get_doc_processing_status(
         db,
         document_id
     )

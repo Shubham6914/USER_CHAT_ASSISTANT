@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import (
     get_db,
@@ -51,9 +51,9 @@ class VerifyAccessTokenRequest(BaseModel):
 
 
 @router.post("/signup")
-def signup(
+async def signup(
     request: SignupRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Register a new user.
@@ -61,7 +61,7 @@ def signup(
 
     try:
 
-        user = UserService.create_user(
+        user = await UserService.create_user(
             db,
             request.user_name,
             request.user_email,
@@ -88,9 +88,9 @@ def signup(
 
 
 @router.post("/login")
-def login(
+async def login(
     request: LoginRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Authenticate user and return tokens.
@@ -98,7 +98,7 @@ def login(
 
     try:
 
-        return UserService.login_user(
+        return await UserService.login_user(
             db,
             request.user_email,
             request.password
@@ -119,9 +119,9 @@ def login(
 
 
 @router.post("/refresh")
-def refresh_token(
+async def refresh_token(
     request: RefreshRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Generate new access token using refresh token.
@@ -129,13 +129,14 @@ def refresh_token(
 
     try:
 
-        access_token = UserService.refresh_access_token(
+        res = await UserService.refresh_access_token(
             db,
             request.refresh_token
         )
 
         return {
-            "access_token": access_token,
+            "access_token": res["access_token"],
+            "refresh_token": res["refresh_token"],
             "token_type": "bearer"
         }
 
@@ -154,9 +155,9 @@ def refresh_token(
 
 
 @router.post("/verify-token")
-def verify_access_token(
+async def verify_access_token(
     request: VerifyAccessTokenRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Verify access token validity.
@@ -187,9 +188,9 @@ def verify_access_token(
 
 
 @router.post("/logout")
-def logout(
+async def logout(
     request: LogoutRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Logout user by invalidating refresh token.
@@ -197,7 +198,7 @@ def logout(
 
     try:
 
-        UserService.logout_user(
+        await UserService.logout_user(
             db,
             request.refresh_token
         )
@@ -221,7 +222,7 @@ def logout(
 
 
 @router.get("/me")
-def get_me(
+async def get_me(
     current_user: User = Depends(get_current_user)
 ):
     """

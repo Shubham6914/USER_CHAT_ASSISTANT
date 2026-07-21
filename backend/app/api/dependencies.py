@@ -1,6 +1,7 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 
 from app.core.database_service import database_service
 from app.services.user_service import UserService
@@ -16,18 +17,15 @@ logger = get_logger(__name__)
 security = HTTPBearer()
 
 
-def get_db():
+async def get_db():
     """
-    Provides a database session.
+    Provides an async database session.
 
     Yields:
-        Session: SQLAlchemy database session.
+        AsyncSession: SQLAlchemy database session.
     """
-    db = database_service.get_postgres_session()
-    try:
+    async with database_service.get_postgres_session() as db:
         yield db
-    finally:
-        db.close()
 
 
 def get_pinecone_index():
@@ -40,12 +38,12 @@ def get_pinecone_index():
     return database_service.get_pinecone_index()
 
 
-def get_current_user(
+async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ) -> User:
     """
-    Dependency to get current authenticated user.
+    Dependency to get current authenticated user asynchronously.
 
     Flow:
         - Extract token from Authorization header
@@ -68,7 +66,8 @@ def get_current_user(
         user_id = UserService.verify_access_token(token)
         logger.info(f"Verified user_id from token: {user_id}")
 
-        user = db.query(User).filter(User.user_id == user_id).first()
+        result = await db.execute(select(User).filter(User.user_id == user_id))
+        user = result.scalars().first()
         logger.info(f"Fetched user from DB: {user}")
 
         if not user:

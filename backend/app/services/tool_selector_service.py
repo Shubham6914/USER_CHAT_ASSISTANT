@@ -29,13 +29,13 @@ class ToolSelectorService:
     # MAIN TOOL SELECTION
     # ---------------------------------------------------------
 
-    def select_tool(
+    async def select_tool(
         self,
         query: str,
         user_id: str = None
     ) -> Dict[str, Any]:
         """
-        Select tool for the given query.
+        Select tool for the given query asynchronously.
 
         Args:
             query:
@@ -69,7 +69,7 @@ class ToolSelectorService:
             )
 
 
-            response = llm_client.chat_completion(
+            response = await llm_client.ainvoke(
                 [
                     {
                         "role": "user",

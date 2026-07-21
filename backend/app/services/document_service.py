@@ -1,6 +1,8 @@
 from app.services.logger_service import get_logger
 from app.models.processing_status_model import ProcessingStatus
 from app.models.enums import ProcessingStatusEnum,ProcessingStepEnum
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.exceptions.document_exceptions import (
     InvalidFileTypeException,
@@ -24,9 +26,9 @@ class DocumentService:
         self.logger = get_logger("document_service")
 
 
-    def create_processing_status(self, db, document_id):
+    async def create_processing_status(self, db: AsyncSession, document_id):
         """
-        Create initial processing status for a document.
+        Create initial processing status for a document asynchronously.
         """
 
         try:
@@ -39,8 +41,8 @@ class DocumentService:
 
             db.add(status)
 
-            db.commit()
-            db.refresh(status)
+            await db.commit()
+            await db.refresh(status)
 
             self.logger.info(
                 f"Processing status created for document {document_id}"
@@ -53,12 +55,12 @@ class DocumentService:
                 f"Failed to create processing status: {str(e)}"
             )
 
-            db.rollback()
+            await db.rollback()
             raise
 
-    def update_processing_status(
+    async def update_processing_status(
         self,
-        db,
+        db: AsyncSession,
         document_id,
         status=None,
         current_step=None,
@@ -66,13 +68,16 @@ class DocumentService:
         error_message=None
         ):
         """ss
-        Update processing state for a document.
+        Update processing state for a document asynchronously.
         """
 
         try:
-            record = db.query(ProcessingStatus).filter(
-                ProcessingStatus.document_id == document_id
-            ).first()
+            result = await db.execute(
+                select(ProcessingStatus).filter(
+                    ProcessingStatus.document_id == document_id
+                )
+            )
+            record = result.scalars().first()
 
             if not record:
                 raise ValueError(
@@ -96,7 +101,7 @@ class DocumentService:
                 record.error_message = error_message
 
 
-            db.flush()
+            await db.flush()
 
             self.logger.info(
                 f"""
@@ -116,12 +121,12 @@ class DocumentService:
                 f"Failed to update processing status: {str(e)}"
             )
 
-            db.rollback()
+            await db.rollback()
             raise
 
-    def create_document(self, db, user_id: UUID, file_name: str, file_path: str):
+    async def create_document(self, db: AsyncSession, user_id: UUID, file_name: str, file_path: str):
         """
-        Create a document record in DB.
+        Create a document record in DB asynchronously.
         """
 
         try:
@@ -134,7 +139,7 @@ class DocumentService:
             )
 
             db.add(document)
-            db.flush()  # important
+            await db.flush()  # important
 
             self.logger.info(f"Document created: {document.doc_id}")
 
@@ -145,9 +150,9 @@ class DocumentService:
             raise
 
     
-    def check_user_has_doc(self, db, user_id: str) -> bool:
+    async def check_user_has_doc(self, db: AsyncSession, user_id: str) -> bool:
         """
-        Check if user has at least one uploaded document
+        Check if user has at least one uploaded document asynchronously
         """
 
         if not user_id:
@@ -156,9 +161,12 @@ class DocumentService:
         try:
             from app.models.user_document_model import UserDocument
 
-            doc = db.query(UserDocument).filter(
-                UserDocument.user_id == user_id
-            ).first()
+            result = await db.execute(
+                select(UserDocument).filter(
+                    UserDocument.user_id == user_id
+                )
+            )
+            doc = result.scalars().first()
 
             return doc is not None
 
@@ -167,13 +175,13 @@ class DocumentService:
             return False
         
 
-    def get_doc_processing_status(
+    async def get_doc_processing_status(
         self,
-        db,
+        db: AsyncSession,
         document_id: str
     ):
         """
-        Fetch the processing status of a document.
+        Fetch the processing status of a document asynchronously.
 
         Args:
             db: SQLAlchemy database session.
@@ -187,13 +195,16 @@ class DocumentService:
         """
 
         try:
-            document = (
-                db.query(UserDocument)
+            from app.models.user_document_model import UserDocument
+            from sqlalchemy.orm import joinedload
+            result = await db.execute(
+                select(UserDocument)
+                .options(joinedload(UserDocument.processing_status))
                 .filter(
                     UserDocument.doc_id == document_id
                 )
-                .first()
             )
+            document = result.scalars().first()
 
             print(f"document status------->{document}")
 

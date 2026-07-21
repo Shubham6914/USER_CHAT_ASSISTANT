@@ -32,7 +32,7 @@ class RetrievalService:
         self.embedding_service = EmbeddingService()
 
 
-    def retrieve_similar_chunks(
+    async def retrieve_similar_chunks(
         self,
         query: str,
         user_id: str,
@@ -62,12 +62,12 @@ class RetrievalService:
             self.logger.info(f"[Retrieval] Started for user_id={user_id}")
 
             # Step 1: Generate query embedding
-            query_embedding = self.embedding_service.generate_embeddings(query)
+            query_embedding = await self.embedding_service.generate_embeddings(query)
 
             self.logger.debug(f"[Retrieval] Query embedding generated")
 
             # Step 2: Query Pinecone
-            results = self._query_pinecone(
+            results = await self._query_pinecone(
                 embedding=query_embedding,
                 user_id=user_id,
                 top_k=top_k,
@@ -85,7 +85,7 @@ class RetrievalService:
             self.logger.error(f"[Retrieval] Failed: {str(e)}")
             raise
 
-    def _query_pinecone(
+    async def _query_pinecone(
         self,
         embedding: List[float],
         user_id: str,
@@ -114,7 +114,7 @@ class RetrievalService:
             #     filter=filters,
             #     include_metadata=True
             # )
-            response = self.vector_store.query(
+            response = await self.vector_store.query(
                 embedding=embedding,
                 top_k=top_k,
                 namespace=str(user_id),

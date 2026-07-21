@@ -1,3 +1,5 @@
+import asyncio
+from sqlalchemy import select
 from app.services.chunking_service import ChunkingService
 from app.services.embedding_service import EmbeddingService
 from app.services.document_service import DocumentService
@@ -16,14 +18,9 @@ from app.workers.celery_app import celery_app, database_service
 def add(x, y):
     return x + y
 
-@celery_app.task(
-    bind=True,
-    autoretry_for=(Exception,),
-    retry_kwargs={"max_retries": 3},
-    retry_backoff=True
-)
-def process_document_pipeline(self, document_id: str):
+# Document Ingestion Pipeline Logic
 
+async def async_process_document_pipeline_logic(document_id: str):
     document_service = DocumentService()
     db = None
 
@@ -58,9 +55,10 @@ def process_document_pipeline(self, document_id: str):
         
 
         # 1. Fetch document
-        document = db.query(UserDocument).filter(
-            UserDocument.doc_id == document_id
-        ).first()
+        result = await db.execute(
+            select(UserDocument).filter(UserDocument.doc_id == document_id)
+        )
+        document = result.scalars().first()
 
 
         if not document:
@@ -70,7 +68,7 @@ def process_document_pipeline(self, document_id: str):
         # Document exists
         current_step = ProcessingStepEnum.DOCUMENT_SAVED
 
-        document_service.update_processing_status(
+        await document_service.update_processing_status(
             db,
             document_id,
             status=ProcessingStatusEnum.PROCESSING,
@@ -78,7 +76,7 @@ def process_document_pipeline(self, document_id: str):
             progress=20
         )
         # update progress in db 
-        db.commit()
+        await db.commit()
 
 
         #  Prepare document dict
@@ -92,7 +90,7 @@ def process_document_pipeline(self, document_id: str):
 
         current_step = ProcessingStepEnum.CHUNKING
 
-        document_service.update_processing_status(
+        await document_service.update_processing_status(
             db,
             document_id,
             status=ProcessingStatusEnum.PROCESSING,
@@ -100,7 +98,7 @@ def process_document_pipeline(self, document_id: str):
             progress=40
         )
         # update progress in db 
-        db.commit()
+        await db.commit()
 
 
         logger.info(
@@ -130,7 +128,7 @@ def process_document_pipeline(self, document_id: str):
 
         current_step = ProcessingStepEnum.EMBEDDING
 
-        document_service.update_processing_status(
+        await document_service.update_processing_status(
             db,
             document_id,
             status=ProcessingStatusEnum.PROCESSING,
@@ -138,7 +136,7 @@ def process_document_pipeline(self, document_id: str):
             progress=70
         )
         # update progress in db 
-        db.commit()
+        await db.commit()
 
 
         logger.info(
@@ -146,7 +144,7 @@ def process_document_pipeline(self, document_id: str):
         )
 
 
-        vectors = embedding_service.process_chunks(
+        vectors = await embedding_service.process_chunks(
             chunks
         )
 
@@ -160,7 +158,7 @@ def process_document_pipeline(self, document_id: str):
 
         current_step = ProcessingStepEnum.VECTOR_STORE
 
-        document_service.update_processing_status(
+        await document_service.update_processing_status(
             db,
             document_id,
             status=ProcessingStatusEnum.PROCESSING,
@@ -168,7 +166,7 @@ def process_document_pipeline(self, document_id: str):
             progress=90
         )
         # update progress in db 
-        db.commit()
+        await db.commit()
 
 
         logger.info(
@@ -176,7 +174,7 @@ def process_document_pipeline(self, document_id: str):
         )
 
 
-        vector_store_service.upsert(
+        await vector_store_service.upsert(
             vectors=vectors,
             namespace=str(document.user_id)
         )
@@ -190,7 +188,7 @@ def process_document_pipeline(self, document_id: str):
 
         # 5. Completed
 
-        document_service.update_processing_status(
+        await document_service.update_processing_status(
             db,
             document_id,
             status=ProcessingStatusEnum.COMPLETED,
@@ -198,7 +196,7 @@ def process_document_pipeline(self, document_id: str):
             progress=100
         )
         # update progress in db 
-        db.commit()
+        await db.commit()
 
 
         logger.info(
@@ -217,14 +215,14 @@ def process_document_pipeline(self, document_id: str):
 
             if db:
 
-                document_service.update_processing_status(
+                await document_service.update_processing_status(
                     db,
                     document_id,
                     status=ProcessingStatusEnum.FAILED,
                     current_step=current_step,
                     error_message=str(e)
                 )
-
+                await db.commit()
 
         except Exception as inner_error:
 
@@ -239,4 +237,13 @@ def process_document_pipeline(self, document_id: str):
     finally:
 
         if db:
-            db.close()
+            await db.close()
+
+@celery_app.task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_kwargs={"max_retries": 3},
+    retry_backoff=True
+)
+def process_document_pipeline(self, document_id: str):
+    asyncio.run(async_process_document_pipeline_logic(document_id))

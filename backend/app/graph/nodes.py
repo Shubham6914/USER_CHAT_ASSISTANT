@@ -2,7 +2,7 @@ import json
 import asyncio
 from app.graph.state import AgentState
 
-# import your services
+from app.services.logger_service import get_logger
 from app.services.retrieval_service import RetrievalService
 from app.services.response_service import ResponseService
 from app.services.tool_service import ToolService
@@ -12,6 +12,7 @@ from app.services.tool_selector_service import ToolSelectorService
 
 class GraphNodes:
     def __init__(self):
+        self.logger = get_logger("graph_nodes")
         self.retrieval_service = RetrievalService()
         self.response_service = ResponseService()
         self.tool_service = ToolService(self.retrieval_service)
@@ -25,6 +26,7 @@ class GraphNodes:
     async def analyze_node(self, state: AgentState) -> AgentState:
         query = state["query"]
         user_id = state.get("user_id")
+        self.logger.info(f"[Graph] Executing analyze_node for user: {user_id}, query: '{query}'")
 
         prompt = ANALYZE_QUERY_PROMPT.replace("{query}", query)
 
@@ -39,9 +41,11 @@ class GraphNodes:
             if intent not in ["rag", "tool", "direct"]:
                 intent = "direct"
 
-        except Exception:
+        except Exception as e:
+            self.logger.warning(f"[Graph] Error parsing analyze response: {str(e)}")
             intent = "direct"
 
+        self.logger.info(f"[Graph] Classified query intent as: '{intent}'")
         return {
             "intent": intent,
         }
@@ -52,14 +56,15 @@ class GraphNodes:
     async def rag_node(self, state: AgentState) -> AgentState:
         query = state["query"]
         user_id = state.get("user_id")
+        self.logger.info(f"[Graph] Executing rag_node (document retrieval) for user: {user_id}")
 
-        # RAG database and Pinecone call - wrap in thread executor for non-blocking latency
-        docs = await asyncio.to_thread(
-            self.retrieval_service.retrieve_similar_chunks,
+        # RAG database and Pinecone call - directly await async retrieval
+        docs = await self.retrieval_service.retrieve_similar_chunks(
             query=query,
             user_id=user_id
         )
 
+        self.logger.info(f"[Graph] Retrieval complete. Retrieved {len(docs)} document chunks.")
         return {
             "retrieved_docs": docs
         }
@@ -73,14 +78,15 @@ class GraphNodes:
         # Fix hardcoded tool selection bug (Extract from state if selected by tool_selector_node)
         tool_name = state.get("selected_tool") or "web_search"
         params = state.get("tool_params") or {"query": query}
+        self.logger.info(f"[Graph] Executing tool_node for tool: '{tool_name}' with parameters: {params}")
 
-        # Wrap tool execution in thread executor as it performs HTTP queries
-        tool_result = await asyncio.to_thread(
-            self.tool_service.execute_tool,
+        # Directly await async tool execution
+        tool_result = await self.tool_service.execute_tool(
             tool_name,
             params
         )
 
+        self.logger.info(f"[Graph] Tool '{tool_name}' execution completed.")
         return {
             "tool_response": tool_result
         }
@@ -89,6 +95,7 @@ class GraphNodes:
     # 4. DIRECT NODE
     # ---------------------------
     async def direct_node(self, state: AgentState) -> AgentState:
+        self.logger.info("[Graph] Executing direct_node (routing directly to LLM generator)")
         # no-op node
         return {}
 
@@ -96,13 +103,14 @@ class GraphNodes:
     # 5. Tool Selector Node
     # ---------------------------
     async def tool_selector_node(self, state: AgentState) -> AgentState:
-        # Wrap Tool selection LLM call in thread executor since it is synchronous
-        result = await asyncio.to_thread(
-            self.tool_selector.select_tool,
+        self.logger.info("[Graph] Executing tool_selector_node (selecting external tool)")
+        # Directly await async Tool selection LLM call
+        result = await self.tool_selector.select_tool(
             query=state["query"],
             user_id=state.get("user_id")
         )
 
+        self.logger.info(f"[Graph] Selected tool '{result['tool']}' with params: {result['parameters']}")
         return {
             "selected_tool": result["tool"],
             "tool_params": result["parameters"]
@@ -114,6 +122,7 @@ class GraphNodes:
     async def response_node(self, state: AgentState) -> AgentState:
         intent = state.get("intent", "direct")
         query = state["query"]
+        self.logger.info(f"[Graph] Executing response_node (generating unified token stream) for intent: '{intent}'")
 
         # Resolve correct async stream generator
         if intent == "rag":
@@ -142,6 +151,7 @@ class GraphNodes:
         async for chunk in stream:
             final_text.append(chunk)
 
+        self.logger.info("[Graph] Finished token generation response stream.")
         return {
             "final_response": "".join(final_text)
         }

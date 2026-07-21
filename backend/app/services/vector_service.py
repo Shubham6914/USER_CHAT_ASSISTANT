@@ -2,6 +2,7 @@ from pinecone import Pinecone, ServerlessSpec
 from functools import lru_cache
 from typing import List, Dict, Any, Optional
 import os
+import asyncio
 
 from app.services.logger_service import get_logger
 
@@ -12,13 +13,14 @@ class VectorStoreService:
         self.index = index  # ✅ Use injected index only
 
     # ✅ Upsert
-    def upsert(self, vectors: List[Dict], namespace: str = "default"):
+    async def upsert(self, vectors: List[Dict], namespace: str = "default"):
         try:
             if not vectors:
                 self.logger.warning("No vectors to upsert")
                 return
 
-            self.index.upsert(
+            await asyncio.to_thread(
+                self.index.upsert,
                 vectors=vectors,
                 namespace=namespace
             )
@@ -30,9 +32,10 @@ class VectorStoreService:
             raise
 
     # ✅ Query
-    def query(self, embedding: List[float], top_k: int = 5, namespace: str = "default", filters: Optional[Dict] = None):
+    async def query(self, embedding: List[float], top_k: int = 5, namespace: str = "default", filters: Optional[Dict] = None):
         try:
-            results = self.index.query(
+            results = await asyncio.to_thread(
+                self.index.query,
                 vector=embedding,
                 top_k=top_k,
                 namespace=namespace,
@@ -46,9 +49,13 @@ class VectorStoreService:
             raise
 
     # ✅ Delete
-    def delete(self, ids: List[str], namespace: str = "default"):
+    async def delete(self, ids: List[str], namespace: str = "default"):
         try:
-            self.index.delete(ids=ids, namespace=namespace)
+            await asyncio.to_thread(
+                self.index.delete,
+                ids=ids,
+                namespace=namespace
+            )
             self.logger.info(f"Deleted {len(ids)} vectors")
 
         except Exception as e:
