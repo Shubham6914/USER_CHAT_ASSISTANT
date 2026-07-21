@@ -64,6 +64,19 @@ class ResponseService:
             )
             raise
 
+    async def _astream_llm(self, messages: list):
+        try:
+            self.logger.info("[LLM] Starting async streaming")
+            async for chunk in self.llm_client.astream_chat_completion(messages, config={"tags": ["response"]}):
+                yield chunk
+        except Exception as e:
+            self.logger.error(
+                f"[LLM Async Streaming] Failed: {str(e)}",
+                exc_info=True
+            )
+            raise
+
+
 
     
     # ------------------------------------------------------------------
@@ -181,3 +194,84 @@ class ResponseService:
         except Exception as e:
             self.logger.error(f"[Response] Tool response failed: {str(e)}")
             raise
+
+    async def generate_direct_response_async(
+        self,
+        query: str,
+        system_instructions: str
+    ):
+        try:
+            self.logger.info("[Response] Generating direct response async")
+            messages = [
+                {"role": "system", "content": system_instructions},
+                {"role": "user", "content": query}
+            ]
+            async for chunk in self._astream_llm(messages):
+                yield chunk
+        except Exception as e:
+            self.logger.error(f"[Response] Direct async failed: {str(e)}")
+            raise
+
+    async def generate_rag_response_async(
+        self,
+        query: str,
+        context: str,
+        system_instructions: Optional[str] = None
+    ):
+        try:
+            self.logger.info("[Response] Generating RAG response async")
+            base_instruction = system_instructions or """
+            You are a helpful assistant. Use the provided context to answer the question.
+            If the answer is not in the context, say you don't know.
+            """
+            prompt = f"""
+            Context:
+            {context}
+
+            User Question:
+            {query}
+
+            Answer:
+            """
+            messages = [
+                {"role": "system", "content": base_instruction},
+                {"role": "user", "content": prompt}
+            ]
+            async for chunk in self._astream_llm(messages):
+                yield chunk
+        except Exception as e:
+            self.logger.error(f"[Response] RAG async failed: {str(e)}")
+            raise
+
+    async def generate_tool_response_async(
+        self,
+        query: str,
+        tool_name: str,
+        tool_result: Dict[str, Any]
+    ):
+        try:
+            self.logger.info(f"[Response] Generating tool response async for {tool_name}")
+            prompt = f"""
+            User Query:
+            {query}
+
+            Tool Used:
+            {tool_name}
+
+            Tool Result:
+            {tool_result}
+
+            Generate a clear and user-friendly response.
+            """
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant that explains tool results clearly."
+                },
+                {"role": "user", "content": prompt}
+            ]
+            async for chunk in self._astream_llm(messages):
+                yield chunk
+        except Exception as e:
+            self.logger.error(f"[Response] Tool response async failed: {str(e)}")
+            raise

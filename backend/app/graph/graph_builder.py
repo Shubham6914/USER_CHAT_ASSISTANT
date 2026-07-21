@@ -17,6 +17,7 @@ def build_graph():
     graph.add_node("tool_selector_node", nodes.tool_selector_node)
     graph.add_node("tool_node", nodes.tool_node)
     graph.add_node("direct_node", nodes.direct_node)
+    graph.add_node("response_node", nodes.response_node)
 
     # Entry
     graph.set_entry_point("analyze_node")
@@ -35,9 +36,12 @@ def build_graph():
     # Tool selection -> execution
     graph.add_edge("tool_selector_node", "tool_node")
 
-    # End after planning
-    graph.add_edge("rag_node", END)
-    graph.add_edge("tool_node", END)
-    graph.add_edge("direct_node", END)
+    # Connect execution branches to the unified response node
+    graph.add_edge("rag_node", "response_node")
+    graph.add_edge("tool_node", "response_node")
+    graph.add_edge("direct_node", "response_node")
+
+    # End after response generation
+    graph.add_edge("response_node", END)
 
     return graph.compile()
