@@ -1,15 +1,14 @@
 import { useState } from "react";
+import useChat from "../../hooks/useChat";
 
 function ConversationItem({
   conversation,
   isActive,
   onClick,
 }) {
+  const { updateConversationTitle, deleteConversation } = useChat();
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(conversation.title);
-
-  // NOTE: If updateConversationTitle is needed later, we can hook it up.
-  // Currently, we support UI edits and trigger placeholder actions.
 
   const handleEditStart = (e) => {
     e.stopPropagation();
@@ -19,13 +18,16 @@ function ConversationItem({
   const handleEditSave = (e) => {
     e.stopPropagation();
     setIsEditing(false);
-    // TODO: Integrate backend API to rename conversation here
+    if (editTitle.trim() && editTitle !== conversation.title) {
+      updateConversationTitle(conversation.id, editTitle.trim());
+    }
   };
 
   const handleDeleteClick = (e) => {
     e.stopPropagation();
-    // TODO: Integrate backend API to delete conversation here
-    alert("Delete conversation integration: TODO");
+    if (window.confirm(`Are you sure you want to permanently delete "${conversation.title}"?`)) {
+      deleteConversation(conversation.id);
+    }
   };
 
   return (
