@@ -1,4 +1,4 @@
-from passlib.context import CryptContext
+import bcrypt
 from uuid import UUID
 from app.services.logger_service import get_logger
 
@@ -14,8 +14,7 @@ from app.models.user_model import User
 from app.models.refresh_token_model import RefreshToken
 logger = get_logger(__name__)
 
-# bcrypt config
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# bcrypt config (using raw bcrypt instead of passlib context)
 
 
 class UserService:
@@ -35,7 +34,8 @@ class UserService:
             str: Hashed password.
         """
         try:
-            hashed_password = pwd_context.hash(password)
+            salt = bcrypt.gensalt()
+            hashed_password = bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
             logger.debug("Password hashed successfully.")
             return hashed_password
         except Exception as e:
@@ -55,7 +55,10 @@ class UserService:
             bool: True if password matches, else False.
         """
         try:
-            is_valid = pwd_context.verify(plain_password, hashed_password)
+            is_valid = bcrypt.checkpw(
+                plain_password.encode("utf-8"),
+                hashed_password.encode("utf-8")
+            )
             logger.debug("Password verification completed.")
             return is_valid
         except Exception as e:

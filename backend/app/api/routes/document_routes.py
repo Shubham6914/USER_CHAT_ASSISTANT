@@ -70,6 +70,7 @@ def run_query(
     response_stream = orchestrator.run(
         query=request.query,
         user_id=current_user.user_id,
+        chat_id=request.chat_id,
         db=db
     )
 
