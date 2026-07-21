@@ -2,7 +2,7 @@ from uuid import UUID
 from typing import Dict, Any, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_db, get_current_user
 from app.models.user_model import User
@@ -46,16 +46,16 @@ chat_title_service = ChatTitleService()
 # -------------------- Chat Session Routes --------------------
 
 @router.post("/", response_model=ChatResponse, status_code=status.HTTP_201_CREATED)
-def create_chat(
+async def create_chat(
     request: CreateChatRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """
     Creates a new chat session for the authenticated user.
     """
     try:
-        chat = chat_service.create_chat(db, current_user.user_id, request.title or "New Chat")
+        chat = await chat_service.create_chat(db, current_user.user_id, request.title or "New Chat")
         return chat
     except Exception as e:
         logger.error(f"Error creating chat: {str(e)}")
@@ -66,16 +66,16 @@ def create_chat(
 
 
 @router.get("/", response_model=ChatListResponse)
-def list_chats(
+async def list_chats(
     include_archived: bool = False,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """
     Lists all chat sessions owned by the authenticated user.
     """
     try:
-        chats = chat_service.list_user_chats(db, current_user.user_id, include_archived=include_archived)
+        chats = await chat_service.list_user_chats(db, current_user.user_id, include_archived=include_archived)
         return ChatListResponse(chats=chats, total=len(chats))
     except Exception as e:
         logger.error(f"Error listing chats: {str(e)}")
@@ -86,16 +86,16 @@ def list_chats(
 
 
 @router.get("/{chat_id}", response_model=ChatResponse)
-def get_chat(
+async def get_chat(
     chat_id: UUID,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """
     Retrieves details of a specific chat session if owned by the current user.
     """
     try:
-        chat = chat_service.get_chat(db, chat_id, current_user.user_id)
+        chat = await chat_service.get_chat(db, chat_id, current_user.user_id)
         return chat
     except ChatNotFoundException as e:
         raise HTTPException(
@@ -116,10 +116,10 @@ def get_chat(
 
 
 @router.patch("/{chat_id}/title", response_model=ChatResponse)
-def update_chat_title(
+async def update_chat_title(
     chat_id: UUID,
     request: UpdateChatTitleRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """
@@ -127,7 +127,7 @@ def update_chat_title(
     """
     try:
         status_enum = request.title_status or TitleStatusEnum.CUSTOM
-        chat = chat_service.update_chat_title(db, chat_id, current_user.user_id, request.title, status_enum)
+        chat = await chat_service.update_chat_title(db, chat_id, current_user.user_id, request.title, status_enum)
         return chat
     except ChatNotFoundException as e:
         raise HTTPException(
@@ -148,16 +148,16 @@ def update_chat_title(
 
 
 @router.patch("/{chat_id}/archive", response_model=ChatResponse)
-def archive_chat(
+async def archive_chat(
     chat_id: UUID,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """
     Archives a chat session (soft delete).
     """
     try:
-        chat = chat_service.archive_chat(db, chat_id, current_user.user_id)
+        chat = await chat_service.archive_chat(db, chat_id, current_user.user_id)
         return chat
     except ChatNotFoundException as e:
         raise HTTPException(
@@ -178,16 +178,16 @@ def archive_chat(
 
 
 @router.delete("/{chat_id}", status_code=status.HTTP_200_OK)
-def delete_chat(
+async def delete_chat(
     chat_id: UUID,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """
     Permanently deletes a chat session and cascade deletes associated data.
     """
     try:
-        chat_service.delete_chat(db, chat_id, current_user.user_id)
+        await chat_service.delete_chat(db, chat_id, current_user.user_id)
         return {"message": "Chat session permanently deleted", "chat_id": chat_id}
     except ChatNotFoundException as e:
         raise HTTPException(
@@ -213,15 +213,15 @@ def delete_chat(
 async def generate_chat_title(
     chat_id: UUID,
     request: GenerateTitleRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """
-    Generates a 3-6 word summary title using ChatTitleService (LLM-based) and updates the chat title.
+    Generates a 3-6 word summary title using ChatTitleService (LLM-based) and updates the chat title asynchronously.
     """
     # Verify chat ownership and existence first
     try:
-        chat_service.get_chat(db, chat_id, current_user.user_id)
+        await chat_service.get_chat(db, chat_id, current_user.user_id)
     except ChatNotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -238,7 +238,7 @@ async def generate_chat_title(
             user_query=request.user_query,
             assistant_response=request.assistant_response or ""
         )
-        updated_chat = chat_service.update_chat_title(
+        updated_chat = await chat_service.update_chat_title(
             db, chat_id, current_user.user_id, generated_title, TitleStatusEnum.GENERATED
         )
         return updated_chat
@@ -253,18 +253,18 @@ async def generate_chat_title(
 # -------------------- Chat Message Routes --------------------
 
 @router.post("/{chat_id}/messages", response_model=ChatMessageResponse, status_code=status.HTTP_201_CREATED)
-def save_user_message(
+async def save_user_message(
     chat_id: UUID,
     request: SaveUserMessageRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """
-    Saves a user message to the specified chat session.
+    Saves a user message to the specified chat session asynchronously.
     """
     # Verify ownership
     try:
-        chat_service.get_chat(db, chat_id, current_user.user_id)
+        await chat_service.get_chat(db, chat_id, current_user.user_id)
     except ChatNotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -277,7 +277,7 @@ def save_user_message(
         )
 
     try:
-        message = chat_message_service.save_user_message(
+        message = await chat_message_service.save_user_message(
             db=db,
             chat_id=chat_id,
             content=request.content,
@@ -295,19 +295,19 @@ def save_user_message(
 
 
 @router.get("/{chat_id}/messages", response_model=MessageListResponse)
-def load_chat_messages(
+async def load_chat_messages(
     chat_id: UUID,
     limit: int = 50,
     offset: int = 0,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """
-    Loads messages for a chat thread ordered by sequence number ascending.
+    Loads messages for a chat thread ordered by sequence number ascending asynchronously.
     """
     # Verify ownership
     try:
-        chat_service.get_chat(db, chat_id, current_user.user_id)
+        await chat_service.get_chat(db, chat_id, current_user.user_id)
     except ChatNotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -320,7 +320,7 @@ def load_chat_messages(
         )
 
     try:
-        messages = chat_message_service.load_chat_messages(db, chat_id, limit, offset)
+        messages = await chat_message_service.load_chat_messages(db, chat_id, limit, offset)
         return MessageListResponse(messages=messages, total=len(messages))
     except Exception as e:
         logger.error(f"Error loading messages for chat {chat_id}: {str(e)}")
@@ -331,18 +331,18 @@ def load_chat_messages(
 
 
 @router.get("/{chat_id}/messages/recent", response_model=MessageListResponse)
-def get_recent_messages(
+async def get_recent_messages(
     chat_id: UUID,
     limit: int = 10,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """
-    Retrieves the N most recent messages for a chat in chronological order.
+    Retrieves the N most recent messages for a chat in chronological order asynchronously.
     """
     # Verify ownership
     try:
-        chat_service.get_chat(db, chat_id, current_user.user_id)
+        await chat_service.get_chat(db, chat_id, current_user.user_id)
     except ChatNotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -355,7 +355,7 @@ def get_recent_messages(
         )
 
     try:
-        messages = chat_message_service.get_recent_messages(db, chat_id, limit)
+        messages = await chat_message_service.get_recent_messages(db, chat_id, limit)
         return MessageListResponse(messages=messages, total=len(messages))
     except Exception as e:
         logger.error(f"Error getting recent messages for chat {chat_id}: {str(e)}")
@@ -366,18 +366,18 @@ def get_recent_messages(
 
 
 @router.get("/messages/{message_id}", response_model=ChatMessageResponse)
-def get_message_by_id(
+async def get_message_by_id(
     message_id: UUID,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """
-    Retrieves a single message by ID and verifies the caller owns the chat it belongs to.
+    Retrieves a single message by ID and verifies the caller owns the chat it belongs to asynchronously.
     """
     try:
-        message = chat_message_service.get_message_by_id(db, message_id)
+        message = await chat_message_service.get_message_by_id(db, message_id)
         # Verify ownership of the parent chat
-        chat_service.get_chat(db, message.chat_id, current_user.user_id)
+        await chat_service.get_chat(db, message.chat_id, current_user.user_id)
         return message
     except ChatMessageNotFoundException as e:
         raise HTTPException(
@@ -403,18 +403,18 @@ def get_message_by_id(
 
 
 @router.post("/{chat_id}/messages/assistant-placeholder", response_model=ChatMessageResponse, status_code=status.HTTP_201_CREATED)
-def create_assistant_placeholder(
+async def create_assistant_placeholder(
     chat_id: UUID,
     request: CreateAssistantPlaceholderRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """
-    Creates an initial assistant message placeholder in PENDING state before streaming.
+    Creates an initial assistant message placeholder in PENDING state before streaming asynchronously.
     """
     # Verify ownership
     try:
-        chat_service.get_chat(db, chat_id, current_user.user_id)
+        await chat_service.get_chat(db, chat_id, current_user.user_id)
     except ChatNotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -427,7 +427,7 @@ def create_assistant_placeholder(
         )
 
     try:
-        message = chat_message_service.create_assistant_placeholder(
+        message = await chat_message_service.create_assistant_placeholder(
             db=db,
             chat_id=chat_id,
             parent_message_id=request.parent_message_id,
@@ -444,32 +444,32 @@ def create_assistant_placeholder(
 
 
 @router.patch("/messages/{message_id}/complete", response_model=ChatMessageResponse)
-def complete_assistant_message(
+async def complete_assistant_message(
     message_id: UUID,
     request: CompleteAssistantMessageRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """
-    Finalizes an assistant response upon completion of token streaming/generation.
+    Finalizes an assistant response upon completion of token streaming/generation asynchronously.
     """
     try:
-        message = chat_message_service.get_message_by_id(db, message_id)
+        message = await chat_message_service.get_message_by_id(db, message_id)
         # Verify ownership of parent chat
-        chat_service.get_chat(db, message.chat_id, current_user.user_id)
+        await chat_service.get_chat(db, message.chat_id, current_user.user_id)
     except ChatMessageNotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e)
         )
-    except (ChatNotFoundException, ChatAccessDeniedException) as e:
+    except (ChatNotFoundException, ChatAccessDeniedException):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access to complete this message is denied."
         )
 
     try:
-        updated_msg = chat_message_service.complete_assistant_message(
+        updated_msg = await chat_message_service.complete_assistant_message(
             db=db,
             message_id=message_id,
             content=request.content,
@@ -485,32 +485,32 @@ def complete_assistant_message(
 
 
 @router.patch("/messages/{message_id}/fail", response_model=ChatMessageResponse)
-def fail_assistant_message(
+async def fail_assistant_message(
     message_id: UUID,
     request: FailAssistantMessageRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """
-    Marks an assistant response as FAILED, preserving partial content and recording error details.
+    Marks an assistant response as FAILED, preserving partial content and recording error details asynchronously.
     """
     try:
-        message = chat_message_service.get_message_by_id(db, message_id)
+        message = await chat_message_service.get_message_by_id(db, message_id)
         # Verify ownership of parent chat
-        chat_service.get_chat(db, message.chat_id, current_user.user_id)
+        await chat_service.get_chat(db, message.chat_id, current_user.user_id)
     except ChatMessageNotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e)
         )
-    except (ChatNotFoundException, ChatAccessDeniedException) as e:
+    except (ChatNotFoundException, ChatAccessDeniedException):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access to mark this message as failed is denied."
         )
 
     try:
-        updated_msg = chat_message_service.fail_assistant_message(
+        updated_msg = await chat_message_service.fail_assistant_message(
             db=db,
             message_id=message_id,
             partial_content=request.partial_content or "",

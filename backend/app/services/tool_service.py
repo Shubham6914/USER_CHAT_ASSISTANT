@@ -62,7 +62,7 @@ class ToolService:
     # MAIN EXECUTION
     # ------------------------------------------------------------------
 
-    def execute_tool(self, tool_name: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_tool(self, tool_name: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """
         Execute a tool
 
@@ -82,7 +82,7 @@ class ToolService:
 
             tool_func = self.tools[tool_name]
 
-            result = tool_func(params)
+            result = await tool_func(params)
 
             self.logger.info(f"[ToolService] Tool '{tool_name}' executed successfully")
 
@@ -112,7 +112,7 @@ class ToolService:
     # TOOL 1: WEB SEARCH (Stub / Replace later)
     # ------------------------------------------------------------------
 
-    def _web_search_tool(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _web_search_tool(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """
         Perform a web search using the Tavily Search API.
 
@@ -135,7 +135,7 @@ class ToolService:
             raise ValueError("Missing 'query' parameter")
 
         try:
-            results = self.tavily_search.invoke(query)
+            results = await self.tavily_search.ainvoke(query)
 
             return {
                 "query": query,
@@ -150,7 +150,7 @@ class ToolService:
     # TOOL 2: CALCULATOR (SAFE)
     # ------------------------------------------------------------------
 
-    def _calculator_tool(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _calculator_tool(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """
         Safe calculator tool
 
@@ -202,7 +202,7 @@ class ToolService:
     # TOOL 3: SEARCH DOCS (RAG TOOL)
     # ------------------------------------------------------------------
 
-    def _search_docs_tool(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _search_docs_tool(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """
         Retrieval tool using internal vector DB
 
@@ -223,7 +223,7 @@ class ToolService:
             raise ValueError("Missing 'query' or 'user_id'")
 
         # 🔹 Call your RetrievalService
-        chunks = self.retrieval_service.retrieve_similar_chunks(
+        chunks = await self.retrieval_service.retrieve_similar_chunks(
             query=query,
             user_id=user_id,
             top_k=top_k
@@ -238,7 +238,7 @@ class ToolService:
             "context": context
         }
 
-    def _direct_llm_tool(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _direct_llm_tool(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """
         Direct LLM call with controlled instructions.
 
@@ -271,7 +271,7 @@ class ToolService:
             """
 
             # 🔹 Call LLM Service (you already/will have this)
-            response = llm_client.chat_completion([
+            response = await llm_client.ainvoke([
                 {"role": "user", "content": prompt}
             ])
 

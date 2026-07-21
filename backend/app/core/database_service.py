@@ -1,7 +1,7 @@
 # app/services/database_service.py
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
 
 from pinecone import Pinecone, ServerlessSpec
@@ -51,7 +51,7 @@ class DatabaseService:
         Construct PostgreSQL connection URL from individual config values.
         """
         return (
-            f"postgresql+psycopg2://{settings.POSTGRES_USER}:"
+            f"postgresql+asyncpg://{settings.POSTGRES_USER}:"
             f"{settings.POSTGRES_PASSWORD}@{settings.POSTGRES_HOST}:"
             f"{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}"
         )
@@ -59,25 +59,27 @@ class DatabaseService:
 
     def initialize_postgres_connection(self) -> None:
         """
-        Initialize PostgreSQL connection using SQLAlchemy engine.
+        Initialize PostgreSQL connection using SQLAlchemy async engine.
 
         This method:
-        - Creates engine
-        - Configures session factory
+        - Creates async engine
+        - Configures async session factory
 
         Should be called once at application startup.
         """
         try:
-            self._engine = create_engine(
+            self._engine = create_async_engine(
                 self._build_postgres_url(),
                 echo=settings.POSTGRES_ECHO,
                 pool_pre_ping=True,
             )
 
-            self._SessionLocal = sessionmaker(
+            self._SessionLocal = async_sessionmaker(
                 autocommit=False,
                 autoflush=False,
                 bind=self._engine,
+                class_=AsyncSession,
+                expire_on_commit=False
             )
 
             logger.info("PostgreSQL connection initialized")
@@ -86,34 +88,27 @@ class DatabaseService:
             logger.error(f"Failed to initialize PostgreSQL: {str(e)}")
             raise
 
-    def get_postgres_session(self) -> Session:
+    def get_postgres_session(self) -> AsyncSession:
         """
         Create and return a new database session.
 
         Returns:
-            Session: SQLAlchemy session object
-
-        Usage:
-            db = db_service.get_postgres_session()
-            try:
-                ...
-            finally:
-                db.close()
+            AsyncSession: SQLAlchemy async session object
         """
         if not self._SessionLocal:
             raise RuntimeError("PostgreSQL not initialized")
 
         return self._SessionLocal()
 
-    def close_postgres_session(self, session: Session) -> None:
+    async def close_postgres_session(self, session: AsyncSession) -> None:
         """
         Safely close a PostgreSQL session.
 
         Args:
-            session (Session): Active SQLAlchemy session
+            session (AsyncSession): Active SQLAlchemy session
         """
         try:
-            session.close()
+            await session.close()
         except Exception as e:
             logger.warning(f"Error closing session: {str(e)}")
 
@@ -182,7 +177,7 @@ class DatabaseService:
     # Health Check
     # ------------------------------------------------------------------
 
-    def check_database_health(self) -> dict:
+    async def check_database_health(self) -> dict:
         """
         Check health of PostgreSQL and Pinecone connections.
 
@@ -197,8 +192,8 @@ class DatabaseService:
         # Check PostgreSQL
         try:
             if self._engine:
-                with self._engine.connect() as conn:
-                    conn.execute("SELECT 1")
+                async with self._engine.connect() as conn:
+                    await conn.execute(text("SELECT 1"))
                 health_status["postgres"] = True
         except Exception as e:
             logger.error(f"Postgres health check failed: {str(e)}")

@@ -25,12 +25,10 @@ class OrchestrationService:
         """
         document_service = DocumentService()
 
-        # Hybrid approach: wrap database lookups in a thread pool to avoid blocking the event loop
+        # Directly await database lookup since DocumentService is async
         has_docs = False
         if user_id and db:
-            has_docs = await asyncio.to_thread(
-                document_service.check_user_has_doc, db, user_id
-            )
+            has_docs = await document_service.check_user_has_doc(db, user_id)
 
         # Initial state
         state: AgentState = {

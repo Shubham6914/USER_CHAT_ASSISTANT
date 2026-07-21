@@ -6,7 +6,9 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta
 
 from app.core.config import settings
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, delete
+import asyncio
 
 from datetime import datetime
 from app.models.user_model import User
@@ -23,9 +25,9 @@ class UserService:
     """
 
     @staticmethod
-    def hash_password(password: str) -> str:
+    async def hash_password(password: str) -> str:
         """
-        Hashes a plain text password using bcrypt.
+        Hashes a plain text password using bcrypt asynchronously.
 
         Args:
             password (str): Plain text password.
@@ -34,8 +36,9 @@ class UserService:
             str: Hashed password.
         """
         try:
-            salt = bcrypt.gensalt()
-            hashed_password = bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
+            hashed_password = await asyncio.to_thread(
+                lambda: bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+            )
             logger.debug("Password hashed successfully.")
             return hashed_password
         except Exception as e:
@@ -43,9 +46,9 @@ class UserService:
             raise
 
     @staticmethod
-    def verify_password(plain_password: str, hashed_password: str) -> bool:
+    async def verify_password(plain_password: str, hashed_password: str) -> bool:
         """
-        Verifies a plain text password against a hashed password.
+        Verifies a plain text password against a hashed password asynchronously.
 
         Args:
             plain_password (str): User provided password.
@@ -55,9 +58,8 @@ class UserService:
             bool: True if password matches, else False.
         """
         try:
-            is_valid = bcrypt.checkpw(
-                plain_password.encode("utf-8"),
-                hashed_password.encode("utf-8")
+            is_valid = await asyncio.to_thread(
+                lambda: bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
             )
             logger.debug("Password verification completed.")
             return is_valid
@@ -159,9 +161,9 @@ class UserService:
         
         
     @staticmethod
-    def refresh_access_token(db: Session, refresh_token: str) -> str:
+    async def refresh_access_token(db: AsyncSession, refresh_token: str) -> dict:
         """
-        Generates a new access token and rotates the refresh token.
+        Generates a new access token and rotates the refresh token asynchronously.
 
         This function implements **refresh token rotation security model**:
         the old refresh token is invalidated and replaced with a new one.
@@ -179,7 +181,7 @@ class UserService:
             10. Return new access token and refresh token
 
         Args:
-            db (Session): Database session.
+            db (AsyncSession): Database session.
             refresh_token (str): JWT refresh token provided by client.
 
         Returns:
@@ -205,10 +207,13 @@ class UserService:
             user_id = UUID(payload["sub"])
 
             # check token exists in DB
-            token_entry = db.query(RefreshToken).filter(
-                RefreshToken.refresh_token == refresh_token,
-                RefreshToken.user_id == user_id
-            ).first()
+            result = await db.execute(
+                select(RefreshToken).filter(
+                    RefreshToken.refresh_token == refresh_token,
+                    RefreshToken.user_id == user_id
+                )
+            )
+            token_entry = result.scalars().first()
 
             if not token_entry:
                 raise Exception("Refresh token not found")
@@ -218,7 +223,7 @@ class UserService:
                 raise Exception("Refresh token expired")
 
             # 🔥 ROTATE TOKEN (delete old + create new)
-            db.delete(token_entry)
+            await db.delete(token_entry)
 
             new_access_token = UserService.generate_access_token(user_id)
             new_refresh_token, new_expiry = UserService.generate_refresh_token(user_id)
@@ -230,7 +235,7 @@ class UserService:
             )
 
             db.add(new_entry)
-            db.commit()
+            await db.commit()
 
             return {
                 "access_token": new_access_token,
@@ -246,12 +251,12 @@ class UserService:
             raise
         
     @staticmethod
-    def create_user(db: Session, user_name: str, user_email: str, password: str) -> User:
+    async def create_user(db: AsyncSession, user_name: str, user_email: str, password: str) -> User:
         """
-        Creates a new user in the database.
+        Creates a new user in the database asynchronously.
 
         Args:
-            db (Session): Database session.
+            db (AsyncSession): Database session.
             user_name (str): Name of the user.
             user_email (str): Email of the user.
             password (str): Plain text password.
@@ -265,12 +270,13 @@ class UserService:
         try:
             user_email = user_email.strip().lower()
             # check if user already exists
-            existing_user = db.query(User).filter(User.user_email == user_email).first()
+            result = await db.execute(select(User).filter(User.user_email == user_email))
+            existing_user = result.scalars().first()
             if existing_user:
                 raise Exception("User already exists")
 
             # hash password
-            hashed_password = UserService.hash_password(password)
+            hashed_password = await UserService.hash_password(password)
 
             # create user
             new_user = User(
@@ -280,21 +286,21 @@ class UserService:
             )
 
             db.add(new_user)
-            db.commit()
-            db.refresh(new_user)
+            await db.commit()
+            await db.refresh(new_user)
 
             logger.info(f"User created with email={user_email}")
             return new_user
 
         except Exception as e:
-            db.rollback()
+            await db.rollback()
             logger.error(f"Error creating user: {str(e)}")
             raise
     
     @staticmethod
-    def login_user(db: Session, user_email: str, password: str) -> dict:
+    async def login_user(db: AsyncSession, user_email: str, password: str) -> dict:
         """
-        Authenticates a user and creates a new session with access and refresh tokens.
+        Authenticates a user and creates a new session with access and refresh tokens asynchronously.
 
         This function enforces a **single active session per user** by deleting any
         existing refresh token before issuing new tokens.
@@ -309,7 +315,7 @@ class UserService:
             7. Return authentication tokens
 
         Args:
-            db (Session): Database session.
+            db (AsyncSession): Database session.
             user_email (str): Registered email of the user.
             password (str): Plain text password provided by user.
 
@@ -327,22 +333,24 @@ class UserService:
             # get user
             
             user_email = user_email.strip().lower()
-            user = (
-                db.query(User)
+            result = await db.execute(
+                select(User)
                 .filter(User.user_email == user_email)
-                .first()
             )
+            user = result.scalars().first()
             if not user:
                 raise Exception("Invalid email or password")
 
             # verify password
-            if not UserService.verify_password(password, user.password_hash):
+            if not await UserService.verify_password(password, user.password_hash):
                 raise Exception("Invalid email or password")
             
              # ✅ delete existing refresh token (single session rule)
-            db.query(RefreshToken).filter(
-                RefreshToken.user_id == user.user_id
-            ).delete()
+            await db.execute(
+                delete(RefreshToken).filter(
+                    RefreshToken.user_id == user.user_id
+                )
+            )
 
             # generate tokens
             access_token = UserService.generate_access_token(user.user_id)
@@ -356,7 +364,7 @@ class UserService:
             )
 
             db.add(token_entry)
-            db.commit()
+            await db.commit()
 
             logger.info(f"User logged in successfully user_id={user.user_id}")
 
@@ -368,14 +376,14 @@ class UserService:
             }
 
         except Exception as e:
-            db.rollback()
+            await db.rollback()
             logger.error(f"Login failed: {str(e)}")
             raise
     
     @staticmethod
-    def logout_user(db: Session, refresh_token: str) -> None:
+    async def logout_user(db: AsyncSession, refresh_token: str) -> None:
         """
-        Logs out a user by invalidating their refresh token.
+        Logs out a user by invalidating their refresh token asynchronously.
 
         This function removes the refresh token from the database, effectively
         ending the user's session.
@@ -387,7 +395,7 @@ class UserService:
             4. Commit transaction
 
         Args:
-            db (Session): Database session.
+            db (AsyncSession): Database session.
             refresh_token (str): Refresh token to invalidate.
 
         Returns:
@@ -397,20 +405,23 @@ class UserService:
             Exception: If refresh token is invalid or not found in database.
         """
         try:
-            token_entry = db.query(RefreshToken).filter(
-                RefreshToken.refresh_token == refresh_token
-            ).first()
+            result = await db.execute(
+                select(RefreshToken).filter(
+                    RefreshToken.refresh_token == refresh_token
+                )
+            )
+            token_entry = result.scalars().first()
 
             if not token_entry:
                 raise Exception("Invalid refresh token")
 
-            db.delete(token_entry)
-            db.commit()
+            await db.delete(token_entry)
+            await db.commit()
 
             logger.info(f"User logged out successfully user_id={token_entry.user_id}")
 
         except Exception as e:
-            db.rollback()
+            await db.rollback()
             logger.error(f"Logout failed: {str(e)}")
             raise
     
