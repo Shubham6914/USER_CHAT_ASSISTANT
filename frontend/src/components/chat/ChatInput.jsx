@@ -2,16 +2,14 @@ import { useState, useRef, useEffect } from "react";
 import useChat from "../../hooks/useChat";
 import useAuth from "../../hooks/useAuth";
 import { uploadDocument, getDocumentStatus } from "../../services/docService";
-import { queryAssistantStream } from "../../services/chatService";
 
 function ChatInput() {
-  const { activeConversation, addMessage, updateMessage } = useChat();
+  const { activeConversation, addMessage, isGenerating, sendMessage } = useChat();
   const { user } = useAuth();
   const [message, setMessage] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
   const [uploadStep, setUploadStep] = useState(null);
-  const [isGenerating, setIsGenerating] = useState(false);
   
   const textareaRef = useRef(null);
 
@@ -38,75 +36,13 @@ function ChatInput() {
       return;
     }
 
-    // 1. Add user message locally
-    addMessage(activeConversation.id, {
-      id: Date.now(),
-      role: "user",
-      content: messageText,
-    });
-
     setMessage("");
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
 
-    // 2. Add placeholder bot message with "Thinking..." status
-    const botMessageId = Date.now() + 1;
-    addMessage(activeConversation.id, {
-      id: botMessageId,
-      role: "assistant",
-      content: "Thinking...",
-    });
-
-    setIsGenerating(true);
-    try {
-      if (!user || !user.id) {
-        throw new Error("You must be logged in to send messages.");
-      }
-
-      let streamedText = "";
-      let hasReceivedFirstChunk = false;
-
-      // Call assistant query streaming API in chatService.js
-      await queryAssistantStream(
-        user.id,
-        messageText,
-        (chunk) => {
-          if (!hasReceivedFirstChunk) {
-            hasReceivedFirstChunk = true;
-            // Clear "Thinking..." placeholder and start printing chunk
-            streamedText = chunk;
-          } else {
-            streamedText += chunk;
-          }
-          // Update the message bubble content in real-time (token-by-token)
-          updateMessage(activeConversation.id, botMessageId, streamedText);
-        },
-        (sources) => {
-          // Update the message bubble state with the retrieved document sources list
-          updateMessage(activeConversation.id, botMessageId, { sources: sources });
-        },
-        () => {
-          setIsGenerating(false);
-        },
-        (err) => {
-          // Show error in the chat bubble for transparent UX feedback
-          updateMessage(
-            activeConversation.id,
-            botMessageId,
-            `⚠️ **Query failed**: ${err.message || "An unexpected error occurred while communicating with the server."}`
-          );
-          setIsGenerating(false);
-        }
-      );
-    } catch (err) {
-      updateMessage(
-        activeConversation.id,
-        botMessageId,
-        `⚠️ **Query failed**: ${err.message || "An unexpected error occurred."}`
-      );
-      setIsGenerating(false);
-    }
+    // Delegate message pipeline execution to Context
+    await sendMessage(messageText);
   };
 
   const handleKeyDown = (e) => {
