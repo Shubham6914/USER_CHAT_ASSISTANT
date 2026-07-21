@@ -57,7 +57,7 @@ def upload_document(
 
 
 @router.post("/query")
-def run_query(
+async def run_query(
     request: QueryRequest,
     db=Depends(get_db),
     current_user: User = Depends(get_current_user),
