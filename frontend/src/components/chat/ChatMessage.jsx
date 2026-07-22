@@ -43,7 +43,7 @@ function CodeBlock({ language, code }) {
 }
 
 function ChatMessage({ role, content, sources }) {
-  const isUser = role === "user";
+  const isUser = role?.toLowerCase() === "user";
 
   /**
    * Premium Markdown Formatter converting text blocks, code blocks, lists, and inline tags.

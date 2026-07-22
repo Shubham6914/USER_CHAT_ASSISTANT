@@ -8,6 +8,8 @@ import Home from "../pages/Home";
 import Study from "../pages/Study";
 import MockInterview from "../pages/MockInterview";
 import ResumeReview from "../pages/ResumeReview";
+import DocumentHub from "../pages/DocumentHub";
+import DocChatSession from "../pages/DocChatSession";
 
 import ProtectedRoute from "../components/layout/ProtectedRoute";
 
@@ -66,6 +68,24 @@ function AppRoutes() {
         />
 
         <Route
+          path="/chat-with-doc"
+          element={
+            <ProtectedRoute>
+              <DocumentHub />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/chat-with-doc/:docId"
+          element={
+            <ProtectedRoute>
+              <DocChatSession />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/settings"
           element={
             <ProtectedRoute>
@@ -74,9 +94,11 @@ function AppRoutes() {
           }
         />
 
+
       </Routes>
     </BrowserRouter>
   );
 }
+
 
 export default AppRoutes;

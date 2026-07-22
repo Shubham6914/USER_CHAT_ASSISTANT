@@ -98,7 +98,7 @@ function ChatProvider({ children }) {
         const data = await loadChatMessages(activeConversationId);
         const mappedMessages = data.messages.map((m) => ({
           id: m.message_id,
-          role: m.role,
+          role: m.role ? m.role.toLowerCase() : "user",
           content: m.content,
           status: m.status,
           sources: m.meta_data?.sources || null,

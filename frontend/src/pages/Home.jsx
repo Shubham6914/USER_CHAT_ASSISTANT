@@ -110,7 +110,7 @@ function Home() {
             Nexus Suite Services
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
             
             {/* CARD 1: Chat with Nexus */}
             <div className="group relative glass-panel rounded-3xl p-6 border border-slate-200/50 dark:border-zinc-800/80 hover:border-brand-500/40 dark:hover:border-brand-500/30 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between overflow-hidden">
@@ -224,6 +224,35 @@ function Home() {
                 </svg>
               </Link>
             </div>
+
+            {/* CARD 5: Chat with Document */}
+            <div className="group relative glass-panel rounded-3xl p-6 border border-slate-200/50 dark:border-zinc-800/80 hover:border-amber-500/40 dark:hover:border-amber-500/30 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-bl-full group-hover:bg-amber-500/10 transition-all duration-300" />
+              <div>
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 dark:bg-amber-500/5 text-amber-600 dark:text-amber-450 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-200">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                  </svg>
+                </div>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-extrabold text-slate-800 dark:text-zinc-150 text-base tracking-tight">Doc Q&A</h3>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400">New</span>
+                </div>
+                <p className="text-slate-500 dark:text-zinc-400 text-xs sm:text-sm leading-relaxed mb-6">
+                  Upload specific files (PDF, DOC) and chat with them in a dedicated environment. Perfect for focused document queries.
+                </p>
+              </div>
+              <Link
+                to="/chat-with-doc"
+                className="w-full flex items-center justify-between py-2.5 px-4 rounded-xl bg-amber-500/5 dark:bg-amber-500/10 hover:bg-amber-600 hover:text-white dark:hover:bg-amber-600 text-amber-600 dark:text-amber-400 text-xs font-bold transition-all duration-200 cursor-pointer"
+              >
+                <span>Chat with Doc</span>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </Link>
+            </div>
+
 
           </div>
         </section>
