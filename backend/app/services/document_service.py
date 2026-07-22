@@ -229,3 +229,22 @@ class DocumentService:
                 f"Failed to fetch processing status for document {document_id}: {str(e)}"
             )
             raise
+
+    async def get_user_documents(self, db: AsyncSession, user_id: UUID):
+        """
+        Fetch all uploaded documents for a user asynchronously.
+        """
+        try:
+            from app.models.user_document_model import UserDocument
+            from sqlalchemy.orm import joinedload
+
+            result = await db.execute(
+                select(UserDocument)
+                .options(joinedload(UserDocument.processing_status))
+                .filter(UserDocument.user_id == user_id)
+                .order_by(UserDocument.created_at.desc())
+            )
+            return result.scalars().all()
+        except Exception as e:
+            self.logger.error(f"Failed to fetch user documents: {str(e)}")
+            raise
