@@ -1,4 +1,5 @@
 import bcrypt
+import uuid
 from uuid import UUID
 from app.services.logger_service import get_logger
 
@@ -99,7 +100,7 @@ class UserService:
     @staticmethod
     def generate_refresh_token(user_id: UUID) -> tuple[str, datetime]:
         """
-        Generates a refresh token.
+        Generates a refresh token with a unique JTI claim.
 
         Args:
             user_id (UUID): ID of the user.
@@ -113,6 +114,7 @@ class UserService:
             payload = {
                 "sub": str(user_id),
                 "type": "refresh",
+                "jti": str(uuid.uuid4()),
                 "exp": expire
             }
 
@@ -124,7 +126,7 @@ class UserService:
         except Exception as e:
             logger.error(f"Error generating refresh token: {str(e)}")
             raise
-    
+
     @staticmethod
     def verify_access_token(token: str) -> UUID:
         """
@@ -158,40 +160,12 @@ class UserService:
         except JWTError as e:
             logger.error(f"Access token verification failed: {str(e)}")
             raise Exception("Invalid or expired access token")
-        
-        
+
     @staticmethod
     async def refresh_access_token(db: AsyncSession, refresh_token: str) -> dict:
         """
         Generates a new access token and rotates the refresh token asynchronously.
-
-        This function implements **refresh token rotation security model**:
-        the old refresh token is invalidated and replaced with a new one.
-
-        Flow:
-            1. Decode and validate JWT refresh token
-            2. Verify token type is "refresh"
-            3. Extract user_id from token
-            4. Validate refresh token exists in database
-            5. Check token expiry
-            6. Delete old refresh token (rotation step)
-            7. Generate new access token
-            8. Generate new refresh token
-            9. Store new refresh token in database
-            10. Return new access token and refresh token
-
-        Args:
-            db (AsyncSession): Database session.
-            refresh_token (str): JWT refresh token provided by client.
-
-        Returns:
-            dict: A dictionary containing:
-                - access_token (str): Newly issued access token
-                - refresh_token (str): Newly issued refresh token
-
-        Raises:
-            Exception: If refresh token is invalid, expired, not found in DB,
-                    or fails JWT validation.
+        Handles concurrent refresh requests gracefully.
         """
         try:
             # decode token
@@ -216,6 +190,21 @@ class UserService:
             token_entry = result.scalars().first()
 
             if not token_entry:
+                # Handle concurrent refresh requests: check if a valid active refresh token exists for user
+                recent_tokens = await db.execute(
+                    select(RefreshToken).filter(
+                        RefreshToken.user_id == user_id,
+                        RefreshToken.expires_at > datetime.utcnow()
+                    ).order_by(RefreshToken.created_at.desc())
+                )
+                active_token = recent_tokens.scalars().first()
+                if active_token:
+                    logger.info(f"Concurrent refresh request detected for user_id={user_id}. Returning active token.")
+                    new_access_token = UserService.generate_access_token(user_id)
+                    return {
+                        "access_token": new_access_token,
+                        "refresh_token": active_token.refresh_token
+                    }
                 raise Exception("Refresh token not found")
 
             # check expiry (extra safety)
