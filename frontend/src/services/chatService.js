@@ -42,7 +42,7 @@ export const queryAssistant = async (userId, query) => {
  *   "user_id": "user_id_string"
  * }
  */
-export const queryAssistantStream = async (userId, query, chatId, onChunk, onSources, onDone, onError) => {
+export const queryAssistantStream = async (userId, query, chatId, onChunk, onSources, onDone, onError, documentIds = null) => {
   try {
     const user = localStorage.getItem("user")
       ? JSON.parse(localStorage.getItem("user"))
@@ -57,15 +57,22 @@ export const queryAssistantStream = async (userId, query, chatId, onChunk, onSou
       headers["Authorization"] = `Bearer ${user.token}`;
     }
 
+    const requestBody = {
+      user_id: userId,
+      query: query,
+      chat_id: chatId,
+    };
+
+    if (documentIds) {
+      requestBody.document_ids = documentIds;
+    }
+
     const response = await fetch("http://127.0.0.1:8000/api/v1/documents/query", {
       method: "POST",
       headers: headers,
-      body: JSON.stringify({
-        user_id: userId,
-        query: query,
-        chat_id: chatId,
-      }),
+      body: JSON.stringify(requestBody),
     });
+
 
     if (!response.ok) {
       const errorText = await response.text();

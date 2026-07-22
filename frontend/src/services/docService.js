@@ -47,3 +47,22 @@ export const getDocumentStatus = async (documentId) => {
     throw new Error(message);
   }
 };
+
+/**
+ * =====================================================
+ * BACKEND INTEGRATION: Fetch All User Documents
+ * =====================================================
+ * API Endpoint: GET http://127.0.0.1:8000/api/v1/documents/
+ * Headers: 
+ *   - Authorization: Bearer <access_token> (auto-attached via Axios interceptor)
+ */
+export const getUserDocuments = async () => {
+  try {
+    const response = await api.get("/api/v1/documents/");
+    return response.data;
+  } catch (error) {
+    const message = error.response?.data?.detail || error.message || "Failed to fetch documents list";
+    throw new Error(message);
+  }
+};
+

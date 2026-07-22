@@ -88,16 +88,28 @@ export const verifyToken = async (accessToken) => {
  *   "refresh_token": "refresh_token_string"
  * }
  */
+let refreshPromise = null;
+
 export const refreshToken = async (refreshTokenVal) => {
-  try {
-    const response = await api.post("/api/v1/auth/refresh", {
-      refresh_token: refreshTokenVal,
-    });
-    return response.data;
-  } catch (error) {
-    const message = error.response?.data?.detail || error.message || "Token refresh failed";
-    throw new Error(message);
+  if (refreshPromise) {
+    return refreshPromise;
   }
+
+  refreshPromise = (async () => {
+    try {
+      const response = await api.post("/api/v1/auth/refresh", {
+        refresh_token: refreshTokenVal,
+      });
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.detail || error.message || "Token refresh failed";
+      throw new Error(message);
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
 };
 
 /**
