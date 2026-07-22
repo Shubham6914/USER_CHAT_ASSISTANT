@@ -11,7 +11,7 @@ class OrchestrationService:
         # compile graph once
         self.graph = build_graph()
 
-    async def run(self, query: str, user_id: str | None = None, chat_id: str | None = None, db = None):
+    async def run(self, query: str, user_id: str | None = None, chat_id: str | None = None, document_ids: list[str] | None = None, db = None):
         """
         Entry point for executing the full workflow asynchronously.
 
@@ -19,6 +19,7 @@ class OrchestrationService:
             query: user query
             user_id: user identifier
             chat_id: conversation id
+            document_ids: optional list of document UUIDs to filter context
 
         Yields:
             chunks of response (sources metadata JSON, raw LLM tokens)
@@ -35,11 +36,13 @@ class OrchestrationService:
             "user_id": user_id,
             "query": query,
             "chat_history": [],
-            "has_docs": has_docs
+            "has_docs": has_docs,
+            "document_ids": document_ids or []
         }
 
         if chat_id:
             state["chat_id"] = chat_id
+
 
         try:
             # Native async streaming of graph events

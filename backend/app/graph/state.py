@@ -5,6 +5,7 @@ class AgentState(TypedDict, total=False):
     # identifiers
     user_id: str
     chat_id: str
+    document_ids: List[str]
 
     # input
     query: str
@@ -25,4 +26,4 @@ class AgentState(TypedDict, total=False):
     final_response: str
 
     # memory
-    chat_history: List[Any]
+    chat_history: List[Any]

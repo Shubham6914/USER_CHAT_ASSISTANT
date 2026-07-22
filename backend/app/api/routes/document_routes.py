@@ -14,8 +14,9 @@ from app.models.user_model import User
 from app.schemas.document_schema import (
     DocumentUploadResponse,
     ProcessingStatusResponse,
+    DocumentResponse,
+    DocumentListResponse,
 )
-
 from app.services.document_upload_service import DocumentUploadService
 from app.services.document_service import DocumentService
 from app.services.orchestration_service import OrchestrationService
@@ -32,6 +33,24 @@ router = APIRouter(
 def get_orchestrator():
     return OrchestrationService()
 
+
+
+@router.get(
+    "/",
+    response_model=DocumentListResponse
+)
+async def list_documents(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    List all uploaded documents and their processing status for the current user.
+    """
+    document_service = DocumentService()
+    docs = await document_service.get_user_documents(db, current_user.user_id)
+    # Serialize documents manually using our from_orm method
+    serialized_docs = [DocumentResponse.from_orm(doc) for doc in docs]
+    return DocumentListResponse(documents=serialized_docs)
 
 
 @router.post(
@@ -71,6 +90,7 @@ async def run_query(
         query=request.query,
         user_id=current_user.user_id,
         chat_id=request.chat_id,
+        document_ids=request.document_ids,
         db=db
     )
 
@@ -96,4 +116,4 @@ async def get_document_status(
         document_id
     )
 
-    return ProcessingStatusResponse.model_validate(status)
+    return ProcessingStatusResponse.model_validate(status)

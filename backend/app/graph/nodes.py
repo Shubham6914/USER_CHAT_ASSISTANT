@@ -58,16 +58,28 @@ class GraphNodes:
         user_id = state.get("user_id")
         self.logger.info(f"[Graph] Executing rag_node (document retrieval) for user: {user_id}")
 
+        # Check for specific document filtering
+        filters = None
+        doc_ids = state.get("document_ids")
+        if doc_ids:
+            if len(doc_ids) == 1:
+                filters = {"document_id": {"$eq": doc_ids[0]}}
+            else:
+                filters = {"document_id": {"$in": doc_ids}}
+            self.logger.info(f"[Graph] Applying Pinecone metadata filter for document_ids: {doc_ids}")
+
         # RAG database and Pinecone call - directly await async retrieval
         docs = await self.retrieval_service.retrieve_similar_chunks(
             query=query,
-            user_id=user_id
+            user_id=user_id,
+            filters=filters
         )
 
         self.logger.info(f"[Graph] Retrieval complete. Retrieved {len(docs)} document chunks.")
         return {
             "retrieved_docs": docs
         }
+
 
     # ---------------------------
     # 3. TOOL NODE
