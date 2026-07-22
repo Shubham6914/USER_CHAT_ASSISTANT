@@ -49,133 +49,35 @@ Always prioritize helpfulness, accuracy, and user trust.
 
 
 ANALYZE_QUERY_PROMPT = """
+You are an expert AI query router and intent classifier.
 
-You are an intelligent query routing classifier for an AI system.
+Your task is to analyze the user's query step-by-step using Chain-of-Thought (CoT) reasoning and select the most accurate system intent:
 
-Your task is to classify the user's query into exactly one intent:
-
-1. rag
-   Use when information must come from internal sources:
-   - uploaded documents
-   - company knowledge
-   - databases
-   - user records
-   - policies
-   - stored information
-
-2. tool
-   Use when the query requires external tools or live information:
-   - latest information
-   - recent updates
-   - current events
-   - news
-   - weather
-   - stock prices
-   - calculations
-   - real-time APIs
-
-3. direct
-   Use only when the answer can be generated from general knowledge
-   and does not require internal or external data.
+Available Intents:
+1. "tool": Use for ALL questions asking for real-world facts, exam details, syllabus, vacancies, salaries, news, recent updates, computations, or any technical/domain questions requiring web search verification.
+2. "rag": Use ONLY when the user is explicitly referring to or asking about their uploaded files, attached documents, or stored private user data.
+3. "direct": Use STRICTLY AND ONLY for simple casual greetings (e.g. "hi", "hello", "good morning"), conversational pleasantries ("thanks", "bye"), or assistant self-identity questions ("who created you").
 
 ------------------------------------------------
-
-CLASSIFICATION RULES:
-
-RULE 1:
-If the query contains freshness indicators, classify as "tool".
-
-Freshness indicators include:
-- latest
-- recent
-- current
-- today
-- now
-- newest
-- trending
-- updates
-- developments
-- news
-- released
-- recently announced
-
-Examples:
-
-"What are the latest AI developments?"
--> tool
-
-"What are recent OpenAI updates?"
--> tool
-
-
-RULE 2:
-If the query refers to internal/company/user information, classify as "rag".
-
-Examples:
-
-"What is our refund policy?"
--> rag
-
-"Show my uploaded report"
--> rag
-
-
-RULE 3:
-If the query is a calculation or requires computation:
-
-Examples:
-
-"25 * 10"
--> tool
-
-
-RULE 4:
-Only classify as "direct" when:
-- No internal data is needed
-- No external/current information is needed
-
-Examples:
-
-"Explain transformers architecture"
--> direct
-
-"What is gradient descent?"
--> direct
-
+CHAIN-OF-THOUGHT ANALYSIS PROCESS:
+Perform internal reasoning step-by-step before selecting the intent:
+- STEP 1 (Factual / Verification Check): Is the query asking about real-world facts, exam syllabi, vacancies, eligibility, salary ranges, news, computations, or domain knowledge requiring citations? -> Classify as "tool".
+- STEP 2 (Document Scope Check): Does the query explicitly refer to user-uploaded files, documents, or stored user records? -> Classify as "rag".
+- STEP 3 (Conversational Check): Is the query purely a casual greeting ("hi", "hello", "thanks") with no factual content? -> Classify as "direct".
 
 ------------------------------------------------
-
-DECISION PROCESS:
-
-Before choosing an intent, evaluate internally:
-
-1. Does this require information that changes over time?
-   If yes -> tool
-
-2. Does this require private or stored information?
-   If yes -> rag
-
-3. Can this be answered from general knowledge?
-   If yes -> direct
-
-
-------------------------------------------------
-
 OUTPUT FORMAT:
-
 Return ONLY valid JSON:
 
 {
-    "intent": "rag" | "tool" | "direct"
+    "thinking": "Brief step-by-step reasoning explaining why the intent was selected",
+    "sub_queries": ["sub_query_1", "sub_query_2"],
+    "intent": "tool" | "rag" | "direct"
 }
 
-
 ------------------------------------------------
-
-Query:
-
+User Query:
 {query}
-
 """
 
 
@@ -188,57 +90,47 @@ Query:
 
 
 TOOL_SELECTOR_PROMPT = """
-You are an AI tool selection system.
+You are an expert AI external tool selector.
 
-Your job is to select the correct tool based on the user query.
+Your job is to select the correct external execution tool for the user query using Chain-of-Thought (CoT) reasoning.
 
-Available tools:
+Available External Tools:
 
 1. web_search
    Description:
-   - Search the internet for current or external information.
-   - Use for latest news, current events, weather, prices, etc.
-
+   - Search the web for live, current, or external factual information.
+   - Mandatory for ALL real-world facts, exam syllabi, eligibility, vacancies, salaries, news, and domain questions.
    Parameters:
    {{
-       "query": "search query"
+       "query": "optimized search query"
    }}
-
 
 2. calculator
    Description:
-   - Perform mathematical calculations.
-
+   - Perform exact mathematical calculations or evaluate arithmetic expressions (e.g. "25 * 45 + 10").
    Parameters:
    {{
        "expression": "mathematical expression"
    }}
 
+------------------------------------------------
+CHAIN-OF-THOUGHT INSTRUCTIONS:
+- Explain your tool choice step-by-step in the "thinking" field.
+- If the query requires factual information, exam details, or general knowledge, select "web_search".
+- If the query is an arithmetic computation, select "calculator".
 
-3. search_docs
-   Description:
-   - Search internal documents, uploaded files, company knowledge,
-     policies, and stored information.
-
-   Parameters:
-   {{
-       "query": "search query",
-       "user_id": "user id",
-       "top_k": 5
-   }}
-
-
-Return ONLY valid JSON.
-
-Format:
+------------------------------------------------
+OUTPUT FORMAT (Return ONLY valid JSON):
 
 {{
-    "tool": "tool_name",
-    "parameters": {{}}
+    "thinking": "Brief reasoning explaining why the tool was selected",
+    "tool": "web_search" | "calculator",
+    "parameters": {{
+        "query": "search query"
+    }}
 }}
 
-
+------------------------------------------------
 User Query:
-
 {query}
 """

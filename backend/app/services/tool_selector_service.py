@@ -63,11 +63,7 @@ class ToolSelectorService:
             raise ValueError("Missing query")
 
         try:
-
-            prompt = TOOL_SELECTOR_PROMPT.format(
-                query=query
-            )
-
+            prompt = TOOL_SELECTOR_PROMPT.format(query=query)
 
             response = await llm_client.ainvoke(
                 [
@@ -78,59 +74,58 @@ class ToolSelectorService:
                 ]
             )
 
-
             tool_plan = self._parse_response(response)
+            selected_tool = tool_plan.get("tool", "web_search")
+            thinking = tool_plan.get("thinking", "")
+            parameters = tool_plan.get("parameters", {"query": query})
 
+            # Allowed external tools only
+            allowed_tools = ["web_search", "calculator"]
+            if selected_tool not in allowed_tools:
+                self.logger.warning(f"[ToolSelector] Unexpected tool '{selected_tool}' -> fallback to 'web_search'")
+                selected_tool = "web_search"
 
-            # Add user_id for RAG tool
-            if (
-                tool_plan.get("tool") == "search_docs"
-                and user_id
-            ):
-                tool_plan["parameters"]["user_id"] = user_id
+            if thinking:
+                self.logger.info(f"[ToolSelector CoT] Thinking: '{thinking}'")
 
+            self.logger.info(f"[ToolSelector] Selected tool: {selected_tool}")
 
-            self.logger.info(
-                f"[ToolSelector] Selected tool: {tool_plan.get('tool')}"
-            )
-
-
-            return tool_plan
-
+            return {
+                "tool": selected_tool,
+                "parameters": parameters
+            }
 
         except Exception as e:
-
-            self.logger.error(
-                f"[ToolSelector] Failed: {str(e)}"
-            )
-
-            raise
-
+            self.logger.error(f"[ToolSelector] Selection failed: {str(e)} -> defaulting to 'web_search'")
+            return {
+                "tool": "web_search",
+                "parameters": {"query": query}
+            }
 
     # ---------------------------------------------------------
     # RESPONSE PARSER
     # ---------------------------------------------------------
 
-    def _parse_response(
-        self,
-        response: str
-    ) -> Dict[str, Any]:
-
+    def _parse_response(self, response: str) -> Dict[str, Any]:
         """
-        Parse LLM JSON response.
+        Parse LLM JSON response cleanly by removing markdown wrappers.
         """
-
         import json
 
+        cleaned = response.strip()
+        if cleaned.startswith("```"):
+            lines = cleaned.splitlines()
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].startswith("```"):
+                lines = lines[:-1]
+            cleaned = "\n".join(lines).strip()
+
         try:
-            return json.loads(response)
-
-        except Exception:
-
-            self.logger.error(
-                "[ToolSelector] Invalid JSON response"
-            )
-
-            raise ValueError(
-                "Tool selector returned invalid JSON"
-            )
+            return json.loads(cleaned)
+        except Exception as e:
+            self.logger.error(f"[ToolSelector] Invalid JSON response: {str(e)}")
+            return {
+                "tool": "web_search",
+                "parameters": {}
+            }

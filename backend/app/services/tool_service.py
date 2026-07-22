@@ -47,16 +47,15 @@ class ToolService:
 
     def _register_tools(self):
         """
-        Register all tools here
+        Register external execution tools here.
+        Note: Document RAG and direct LLM generation are handled by graph nodes (rag_node / direct_node).
         """
-        self.logger.info("[ToolService] Registering tools...")
+        self.logger.info("[ToolService] Registering external tools...")
 
         self.tools["web_search"] = self._web_search_tool
         self.tools["calculator"] = self._calculator_tool
-        self.tools["search_docs"] = self._search_docs_tool
-        self.tools["direct_llm"] = self._direct_llm_tool
 
-        self.logger.info(f"[ToolService] Registered tools: {list(self.tools.keys())}")
+        self.logger.info(f"[ToolService] Registered external tools: {list(self.tools.keys())}")
 
     # ------------------------------------------------------------------
     # MAIN EXECUTION
@@ -197,89 +196,4 @@ class ToolService:
         except Exception as e:
             self.logger.error(f"[Tool:calculator] Failed: {str(e)}")
             raise
-
-    # ------------------------------------------------------------------
-    # TOOL 3: SEARCH DOCS (RAG TOOL)
-    # ------------------------------------------------------------------
-
-    async def _search_docs_tool(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Retrieval tool using internal vector DB
-
-        Input:
-            {
-                "query": "...",
-                "user_id": "...",
-                "top_k": 5
-            }
-        """
-        self.logger.debug(f"[Tool:search_docs] Params: {params}")
-
-        query = params.get("query")
-        user_id = params.get("user_id")
-        top_k = params.get("top_k", 5)
-
-        if not query or not user_id:
-            raise ValueError("Missing 'query' or 'user_id'")
-
-        # 🔹 Call your RetrievalService
-        chunks = await self.retrieval_service.retrieve_similar_chunks(
-            query=query,
-            user_id=user_id,
-            top_k=top_k
-        )
-
-        # Optional: also return context directly
-        context = self.retrieval_service.build_context(chunks)
-
-        return {
-            "query": query,
-            "chunks": chunks,
-            "context": context
-        }
-
-    async def _direct_llm_tool(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Direct LLM call with controlled instructions.
-
-        Input:
-            {
-                "query": "user question"
-            }
-
-        Output:
-            {
-                "response": "LLM output"
-            }
-        """
-        try:
-            self.logger.debug(f"[Tool:direct_llm] Params: {params}")
-
-            query = params.get("query")
-
-            if not query:
-                raise ValueError("Missing 'query'")
-
-            # 🔹 Build prompt using instructions
-            prompt = f"""
-            {LLM_INSTRUCTIONS}
-
-            User Query:
-            {query}
-
-            Answer:
-            """
-
-            # 🔹 Call LLM Service (you already/will have this)
-            response = await llm_client.ainvoke([
-                {"role": "user", "content": prompt}
-            ])
-
-            return {
-                "query": query,
-                "response": response
-            }
-
-        except Exception as e:
-            self.logger.error(f"[Tool:direct_llm] Failed: {str(e)}")
-            raise
+

@@ -198,14 +198,16 @@ class ResponseService:
     async def generate_direct_response_async(
         self,
         query: str,
-        system_instructions: str
+        system_instructions: str,
+        chat_history: Optional[list] = None
     ):
         try:
             self.logger.info("[Response] Generating direct response async")
-            messages = [
-                {"role": "system", "content": system_instructions},
-                {"role": "user", "content": query}
-            ]
+            messages = [{"role": "system", "content": system_instructions}]
+            if chat_history:
+                messages.extend(chat_history)
+            messages.append({"role": "user", "content": query})
+
             async for chunk in self._astream_llm(messages):
                 yield chunk
         except Exception as e:
@@ -216,7 +218,8 @@ class ResponseService:
         self,
         query: str,
         context: str,
-        system_instructions: Optional[str] = None
+        system_instructions: Optional[str] = None,
+        chat_history: Optional[list] = None
     ):
         try:
             self.logger.info("[Response] Generating RAG response async")
@@ -233,24 +236,53 @@ class ResponseService:
 
             Answer:
             """
-            messages = [
-                {"role": "system", "content": base_instruction},
-                {"role": "user", "content": prompt}
-            ]
+            messages = [{"role": "system", "content": base_instruction}]
+            if chat_history:
+                messages.extend(chat_history)
+            messages.append({"role": "user", "content": prompt})
+
             async for chunk in self._astream_llm(messages):
                 yield chunk
         except Exception as e:
             self.logger.error(f"[Response] RAG async failed: {str(e)}")
             raise
 
+    def _format_tool_result_for_prompt(self, tool_name: str, tool_result: Any) -> str:
+        if isinstance(tool_result, dict):
+            data = tool_result.get("data", {})
+            results = None
+            if isinstance(data, dict):
+                res_obj = data.get("results")
+                if isinstance(res_obj, dict):
+                    results = res_obj.get("results")
+                elif isinstance(res_obj, list):
+                    results = res_obj
+            if not results:
+                results = tool_result.get("results")
+
+            if results and isinstance(results, list):
+                formatted_items = []
+                for idx, item in enumerate(results, 1):
+                    if isinstance(item, dict):
+                        title = item.get("title", "Source")
+                        url = item.get("url", "")
+                        content = item.get("content", "")
+                        formatted_items.append(f"Source [{idx}] ({title} | {url}):\n{content}")
+                if formatted_items:
+                    return "\n\n".join(formatted_items)
+        return str(tool_result)
+
     async def generate_tool_response_async(
         self,
         query: str,
         tool_name: str,
-        tool_result: Dict[str, Any]
+        tool_result: Dict[str, Any],
+        chat_history: Optional[list] = None
     ):
         try:
             self.logger.info(f"[Response] Generating tool response async for {tool_name}")
+            formatted_result = self._format_tool_result_for_prompt(tool_name, tool_result)
+            
             prompt = f"""
             User Query:
             {query}
@@ -258,18 +290,33 @@ class ResponseService:
             Tool Used:
             {tool_name}
 
-            Tool Result:
-            {tool_result}
+            Retrieved Tool Results:
+            {formatted_result}
 
-            Generate a clear and user-friendly response.
+            Instructions:
+            Answer the user's query thoroughly using the facts, vacancy counts, salary ranges, dates, and details from the Tool Results above.
             """
+            
+            system_instruction = """
+            You are a detail-oriented, accurate AI assistant.
+            Answer the User Query using the provided Tool Results as your primary source of truth.
+            
+            CRITICAL GUIDELINES:
+            - Extract and report all specific figures, numbers, vacancy counts, salary ranges, dates, and facts present in the Tool Results.
+            - Do NOT state that information is unavailable if facts or figures are present in the Tool Results.
+            - Synthesize the details clearly and concisely.
+            """
+
             messages = [
                 {
                     "role": "system",
-                    "content": "You are a helpful assistant that explains tool results clearly."
-                },
-                {"role": "user", "content": prompt}
+                    "content": system_instruction
+                }
             ]
+            if chat_history:
+                messages.extend(chat_history)
+            messages.append({"role": "user", "content": prompt})
+
             async for chunk in self._astream_llm(messages):
                 yield chunk
         except Exception as e:
