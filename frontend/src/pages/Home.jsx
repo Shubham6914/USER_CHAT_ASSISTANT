@@ -23,13 +23,13 @@ function Home() {
   // Mock dashboard data
   const stats = [
     { label: "Study Hub Usage", value: "14.5 hrs", desc: "This week", color: "text-emerald-500 bg-emerald-500/10" },
-    { label: "Mock Interviews", value: "8 Sessions", desc: "Avg. Score: 84%", color: "text-rose-500 bg-rose-500/10" },
     { label: "ATS Resume Match", value: "78%", desc: "Target: Software Engineer", color: "text-indigo-500 bg-indigo-500/10" },
+    { label: "Document Workspace", value: "Active", desc: "PDF & DOC Q&A Ready", color: "text-amber-500 bg-amber-500/10" },
   ];
 
   const recentActivity = [
-    { text: "Mock Interview (Frontend Developer) completed", time: "2 hours ago", status: "88% score" },
     { text: "Analyzed video 'Next.js 15 Routing Architecture'", time: "Yesterday", status: "Summarized" },
+    { text: "Doc Q&A session initialized with product brief", time: "5 hours ago", status: "Active" },
     { text: "Updated master resume & scanned against ATS rules", time: "3 days ago", status: "78% match" },
   ];
 
@@ -87,7 +87,7 @@ function Home() {
               {greeting}, <span className="text-brand-600 dark:text-brand-400">{user?.name || "Academic Pro"}</span>! 👋
             </h1>
             <p className="text-slate-500 dark:text-zinc-400 max-w-xl text-sm sm:text-base leading-relaxed">
-              Your NexusAI suite is ready. Access your chat agent, organize academic studies, simulate live job interviews, or optimize your resume from one integrated workspace.
+              Your NexusAI suite is ready. Access your chat agent, organize academic studies, or optimize your resume from one integrated workspace.
             </p>
           </div>
           <div className="flex gap-3 shrink-0">
@@ -110,7 +110,7 @@ function Home() {
             Nexus Suite Services
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
             
             {/* CARD 1: Chat with Nexus */}
             <div className="group relative glass-panel rounded-3xl p-6 border border-slate-200/50 dark:border-zinc-800/80 hover:border-brand-500/40 dark:hover:border-brand-500/30 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between overflow-hidden">
@@ -163,34 +163,6 @@ function Home() {
                 className="w-full flex items-center justify-between py-2.5 px-4 rounded-xl bg-emerald-500/5 dark:bg-emerald-500/10 hover:bg-emerald-600 hover:text-white dark:hover:bg-emerald-600 text-emerald-600 dark:text-emerald-400 text-xs font-bold transition-all duration-200 cursor-pointer"
               >
                 <span>Enter Study Lab</span>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                </svg>
-              </Link>
-            </div>
-
-            {/* CARD 3: Mock Interview Prep */}
-            <div className="group relative glass-panel rounded-3xl p-6 border border-slate-200/50 dark:border-zinc-800/80 hover:border-rose-500/40 dark:hover:border-rose-500/30 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/5 rounded-bl-full group-hover:bg-rose-500/10 transition-all duration-300" />
-              <div>
-                <div className="w-12 h-12 rounded-2xl bg-rose-500/10 dark:bg-rose-500/5 text-rose-600 dark:text-rose-400 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-200">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-extrabold text-slate-800 dark:text-zinc-150 text-base tracking-tight">Mock Interview</h3>
-                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400">Sandbox</span>
-                </div>
-                <p className="text-slate-500 dark:text-zinc-400 text-xs sm:text-sm leading-relaxed mb-6">
-                  Simulate tech or behavioral interviews. Type answers to standard questions and receive score breakdowns and model comparisons.
-                </p>
-              </div>
-              <Link
-                to="/mock-interview"
-                className="w-full flex items-center justify-between py-2.5 px-4 rounded-xl bg-rose-500/5 dark:bg-rose-500/10 hover:bg-rose-600 hover:text-white dark:hover:bg-rose-600 text-rose-600 dark:text-rose-400 text-xs font-bold transition-all duration-200 cursor-pointer"
-              >
-                <span>Start Practice</span>
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                 </svg>

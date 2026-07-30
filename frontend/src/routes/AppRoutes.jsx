@@ -6,7 +6,6 @@ import Chat from "../pages/Chat";
 import Settings from "../pages/Settings";
 import Home from "../pages/Home";
 import Study from "../pages/Study";
-import MockInterview from "../pages/MockInterview";
 import ResumeReview from "../pages/ResumeReview";
 import DocumentHub from "../pages/DocumentHub";
 import DocChatSession from "../pages/DocChatSession";
@@ -45,15 +44,6 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <Study />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/mock-interview"
-          element={
-            <ProtectedRoute>
-              <MockInterview />
             </ProtectedRoute>
           }
         />
