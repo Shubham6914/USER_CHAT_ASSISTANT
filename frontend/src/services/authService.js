@@ -134,3 +134,21 @@ export const getMe = async (token) => {
   }
 };
 
+/**
+ * =====================================================
+ * BACKEND INTEGRATION: Google OAuth Endpoint
+ * =====================================================
+ * API Endpoint: POST http://127.0.0.1:8000/api/v1/auth/google
+ */
+export const googleLoginApi = async (idToken) => {
+  try {
+    const response = await api.post("/api/v1/auth/google", {
+      id_token: idToken,
+    });
+    return response.data;
+  } catch (error) {
+    const message = error.response?.data?.detail || error.message || "Google authentication failed";
+    throw new Error(message);
+  }
+};
+

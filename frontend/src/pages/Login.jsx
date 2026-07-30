@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { GoogleLogin } from "@react-oauth/google";
 import Input from "../components/common/Input";
 import Button from "../components/common/Button";
 import useAuth from "../hooks/useAuth";
 
 function Login() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, googleLogin } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -29,6 +30,26 @@ function Login() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    try {
+      setError("");
+      setIsLoading(true);
+      if (!credentialResponse.credential) {
+        throw new Error("No credential received from Google");
+      }
+      await googleLogin(credentialResponse.credential);
+      navigate("/");
+    } catch (err) {
+      setError(err.message || "Google sign-in failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleError = () => {
+    setError("Google Sign-In failed or was cancelled.");
   };
 
   return (
@@ -63,6 +84,27 @@ function Login() {
               <span>{error}</span>
             </div>
           )}
+
+          {/* Google Sign-In Button */}
+          <div className="mb-5 flex flex-col items-center justify-center">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={handleGoogleError}
+              useOneTap
+              theme="outline"
+              size="large"
+              shape="pill"
+              text="continue_with"
+              width="100%"
+            />
+          </div>
+
+          <div className="relative my-6 flex items-center justify-center">
+            <div className="border-t border-slate-200 dark:border-zinc-800 w-full" />
+            <span className="bg-white dark:bg-zinc-900 px-3 text-xs uppercase text-slate-400 dark:text-zinc-500 font-semibold absolute">
+              Or with email
+            </span>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <Input

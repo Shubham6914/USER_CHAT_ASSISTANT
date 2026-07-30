@@ -13,4 +13,4 @@ venv/
 
 uploads/
 
-PLANS/
+PLANS/client_secret_*.json 

@@ -14,7 +14,7 @@
 
 import { createContext, useEffect, useState, useCallback } from "react";
 
-import { signup, signin, verifyToken, refreshToken, getMe } from "../services/authService";
+import { signup, signin, verifyToken, refreshToken, getMe, googleLoginApi } from "../services/authService";
 import {
   saveUser,
   getUser,
@@ -150,6 +150,33 @@ function AuthProvider({ children }) {
     return true;
   };
 
+  const googleLogin = async (idToken) => {
+    const data = await googleLoginApi(idToken);
+
+    const token = data.access_token || data.token;
+    let userId = data.user_id;
+    if (token && !userId) {
+      const decoded = decodeToken(token);
+      if (decoded && decoded.sub) {
+        userId = decoded.sub;
+      }
+    }
+
+    const loggedUser = {
+      id: userId || Date.now(),
+      name: data.user_name || "Google User",
+      email: data.user_email || "",
+      profilePicture: data.profile_picture || null,
+      token: token,
+      refreshToken: data.refresh_token || null,
+    };
+
+    saveUser(loggedUser);
+    setUser(loggedUser);
+
+    return true;
+  };
+
   /**
    * Logout user
    */
@@ -173,6 +200,7 @@ function AuthProvider({ children }) {
           id: data.user_id || storedUser.id,
           name: data.user_name || storedUser.name,
           email: data.user_email || storedUser.email,
+          profilePicture: data.profile_picture || storedUser.profilePicture,
         };
         setUser(updatedUser);
         saveUser(updatedUser);
@@ -191,6 +219,7 @@ function AuthProvider({ children }) {
         user,
         loading,
         login,
+        googleLogin,
         register,
         logout,
         fetchMe,
