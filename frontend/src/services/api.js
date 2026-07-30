@@ -1,7 +1,21 @@
 import axios from "axios";
 
+let inMemoryToken = sessionStorage.getItem("access_token") || null;
+
+export const setInMemoryToken = (token) => {
+  inMemoryToken = token;
+  if (token) {
+    sessionStorage.setItem("access_token", token);
+  } else {
+    sessionStorage.removeItem("access_token");
+  }
+};
+
+export const getInMemoryToken = () => inMemoryToken;
+
 const api = axios.create({
-  baseURL: "http://127.0.0.1:8000",
+  baseURL: "http://localhost:8000",
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
@@ -11,21 +25,13 @@ const api = axios.create({
  * =====================================================
  * BACKEND INTEGRATION: Axios Interceptor for Auth
  * =====================================================
- * Automatically attaches the user's JWT access token to 
- * all authenticated backend requests.
+ * Automatically attaches in-memory access token to requests.
  */
 api.interceptors.request.use(
   (config) => {
-    try {
-      const user = localStorage.getItem("user")
-        ? JSON.parse(localStorage.getItem("user"))
-        : null;
-        
-      if (user && user.token) {
-        config.headers.Authorization = `Bearer ${user.token}`;
-      }
-    } catch (e) {
-      console.error("Failed to parse user for authorization header", e);
+    const token = inMemoryToken || sessionStorage.getItem("access_token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },

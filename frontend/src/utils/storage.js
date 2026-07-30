@@ -10,13 +10,13 @@
 // -------------------------
 
 export const saveUser = (userData) => {
-  localStorage.setItem("user", JSON.stringify(userData));
+  // Best practice: Do not store user credentials/PII in localStorage.
+  // Clean up legacy key if present.
+  localStorage.removeItem("user");
 };
 
 export const getUser = () => {
-  const user = localStorage.getItem("user");
-
-  return user ? JSON.parse(user) : null;
+  return null;
 };
 
 export const removeUser = () => {

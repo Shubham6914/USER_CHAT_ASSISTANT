@@ -90,26 +90,33 @@ export const verifyToken = async (accessToken) => {
  */
 let refreshPromise = null;
 
-export const refreshToken = async (refreshTokenVal) => {
+export const refreshToken = async (refreshTokenVal = null) => {
   if (refreshPromise) {
     return refreshPromise;
   }
 
   refreshPromise = (async () => {
     try {
-      const response = await api.post("/api/v1/auth/refresh", {
-        refresh_token: refreshTokenVal,
-      });
+      const payload = refreshTokenVal ? { refresh_token: refreshTokenVal } : {};
+      const response = await api.post("/api/v1/auth/refresh", payload);
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.detail || error.message || "Token refresh failed";
-      throw new Error(message);
+      return null;
     } finally {
       refreshPromise = null;
     }
   })();
 
   return refreshPromise;
+};
+
+export const logoutApi = async () => {
+  try {
+    const response = await api.post("/api/v1/auth/logout", {});
+    return response.data;
+  } catch (error) {
+    console.error("Logout API call failed", error);
+  }
 };
 
 /**
