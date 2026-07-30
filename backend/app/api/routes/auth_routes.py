@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Response, Request
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +22,21 @@ router = APIRouter(
 )
 
 
+def set_refresh_cookie(response: Response, refresh_token_val: str):
+    """
+    Sets HttpOnly, SameSite cookie for refresh token.
+    """
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token_val,
+        httponly=True,
+        max_age=7 * 24 * 3600,
+        samesite="lax",
+        secure=False,
+        path="/"
+    )
+
+
 # -------------------- Schemas --------------------
 
 class SignupRequest(BaseModel):
@@ -35,11 +51,11 @@ class LoginRequest(BaseModel):
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str
+    refresh_token: Optional[str] = None
 
 
 class LogoutRequest(BaseModel):
-    refresh_token: str
+    refresh_token: Optional[str] = None
 
 
 class VerifyAccessTokenRequest(BaseModel):
@@ -57,17 +73,21 @@ class GoogleAuthRequest(BaseModel):
 @router.post("/google")
 async def google_auth(
     request: GoogleAuthRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db)
 ):
     """
     Authenticate user using Google OAuth 2.0 ID token.
+    Sets HttpOnly refresh token cookie.
     """
 
     try:
-        return await UserService.google_auth_user(
+        res = await UserService.google_auth_user(
             db,
             request.id_token
         )
+        set_refresh_cookie(response, res["refresh_token"])
+        return res
 
     except Exception as e:
         logger.error(
@@ -119,19 +139,23 @@ async def signup(
 @router.post("/login")
 async def login(
     request: LoginRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db)
 ):
     """
     Authenticate user and return tokens.
+    Sets HttpOnly refresh token cookie.
     """
 
     try:
 
-        return await UserService.login_user(
+        res = await UserService.login_user(
             db,
             request.user_email,
             request.password
         )
+        set_refresh_cookie(response, res["refresh_token"])
+        return res
 
 
     except Exception as e:
@@ -149,19 +173,35 @@ async def login(
 
 @router.post("/refresh")
 async def refresh_token(
-    request: RefreshRequest,
+    response: Response,
+    raw_request: Request,
+    request: Optional[RefreshRequest] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Generate new access token using refresh token.
+    Generate new access token using refresh token from cookie or payload.
     """
 
     try:
+        token_val = None
+        if request and request.refresh_token:
+            token_val = request.refresh_token
+        else:
+            token_val = raw_request.cookies.get("refresh_token")
+
+        if not token_val:
+            return {
+                "access_token": None,
+                "refresh_token": None,
+                "authenticated": False
+            }
 
         res = await UserService.refresh_access_token(
             db,
-            request.refresh_token
+            token_val
         )
+
+        set_refresh_cookie(response, res["refresh_token"])
 
         return {
             "access_token": res["access_token"],
@@ -218,19 +258,29 @@ async def verify_access_token(
 
 @router.post("/logout")
 async def logout(
-    request: LogoutRequest,
+    response: Response,
+    raw_request: Request,
+    request: Optional[LogoutRequest] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Logout user by invalidating refresh token.
+    Logout user by invalidating refresh token and clearing cookie.
     """
 
     try:
+        token_val = None
+        if request and request.refresh_token:
+            token_val = request.refresh_token
+        else:
+            token_val = raw_request.cookies.get("refresh_token")
 
-        await UserService.logout_user(
-            db,
-            request.refresh_token
-        )
+        if token_val:
+            await UserService.logout_user(
+                db,
+                token_val
+            )
+
+        response.delete_cookie(key="refresh_token", path="/")
 
         return {
             "message": "Logged out successfully"
@@ -242,11 +292,11 @@ async def logout(
         logger.error(
             f"Logout failed: {str(e)}"
         )
+        response.delete_cookie(key="refresh_token", path="/")
 
-        raise HTTPException(
-            status_code=400,
-            detail=str(e)
-        )
+        return {
+            "message": "Logged out successfully"
+        }
 
 
 

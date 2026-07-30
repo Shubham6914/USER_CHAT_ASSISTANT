@@ -425,13 +425,24 @@ class UserService:
         Returns app JWT access token and refresh token.
         """
         try:
-            # Verify Google ID token
-            id_info = await asyncio.to_thread(
-                google_id_token.verify_oauth2_token,
-                id_token_str,
-                google_requests.Request(),
-                settings.GOOGLE_CLIENT_ID
-            )
+            # Verify Google ID token or Access Token
+            if id_token_str.startswith("ey"):
+                id_info = await asyncio.to_thread(
+                    google_id_token.verify_oauth2_token,
+                    id_token_str,
+                    google_requests.Request(),
+                    settings.GOOGLE_CLIENT_ID
+                )
+            else:
+                import httpx
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(
+                        "https://www.googleapis.com/oauth2/v3/userinfo",
+                        headers={"Authorization": f"Bearer {id_token_str}"}
+                    )
+                    if resp.status_code != 200:
+                        raise Exception("Failed to verify Google access token")
+                    id_info = resp.json()
 
             google_id = id_info.get("sub")
             email = id_info.get("email", "").strip().lower()
