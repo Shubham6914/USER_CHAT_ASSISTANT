@@ -73,6 +73,12 @@ class Settings(BaseSettings):
     #---------------------
     REDIS_URL: str = "redis://127.0.0.1:6379/0"
 
+    #----------------------
+    # Google OAuth Config
+    #---------------------
+    GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+
     
     # -------------------------
     # Validation

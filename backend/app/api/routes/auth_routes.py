@@ -46,8 +46,37 @@ class VerifyAccessTokenRequest(BaseModel):
     access_token: str
 
 
+class GoogleAuthRequest(BaseModel):
+    id_token: str
+
+
 
 # -------------------- Routes --------------------
+
+
+@router.post("/google")
+async def google_auth(
+    request: GoogleAuthRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Authenticate user using Google OAuth 2.0 ID token.
+    """
+
+    try:
+        return await UserService.google_auth_user(
+            db,
+            request.id_token
+        )
+
+    except Exception as e:
+        logger.error(
+            f"Google auth endpoint failed: {str(e)}"
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
 
 
 @router.post("/signup")
@@ -232,5 +261,7 @@ async def get_me(
     return {
         "user_id": current_user.user_id,
         "user_name": current_user.user_name,
-        "user_email": current_user.user_email
+        "user_email": current_user.user_email,
+        "auth_provider": current_user.auth_provider,
+        "profile_picture": current_user.profile_picture
     }

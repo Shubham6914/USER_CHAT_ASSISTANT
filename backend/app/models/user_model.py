@@ -31,7 +31,10 @@ class User(Base):
     user_id = Column(UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4, unique=True)
     user_name = Column(String, nullable=False)
     user_email = Column(String, unique=True, nullable=False, index=True)
-    password_hash = Column(String, nullable=False)
+    password_hash = Column(String, nullable=True)
+    google_id = Column(String, nullable=True, index=True)
+    auth_provider = Column(String, default="local", nullable=False)
+    profile_picture = Column(String, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

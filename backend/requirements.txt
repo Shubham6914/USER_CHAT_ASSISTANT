@@ -67,6 +67,7 @@ MarkupSafe==3.0.3
 msgspec==0.21.1
 multidict==6.7.1
 narwhals==2.21.2
+google-auth==2.38.0
 numpy==2.4.6
 openai==2.38.0
 orjson==3.11.9

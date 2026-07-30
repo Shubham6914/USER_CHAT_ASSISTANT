@@ -15,6 +15,9 @@ from datetime import datetime
 from app.models.user_model import User
 
 from app.models.refresh_token_model import RefreshToken
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport import requests as google_requests
+
 logger = get_logger(__name__)
 
 # bcrypt config (using raw bcrypt instead of passlib context)
@@ -413,5 +416,93 @@ class UserService:
             await db.rollback()
             logger.error(f"Logout failed: {str(e)}")
             raise
-    
-    
+
+    @staticmethod
+    async def google_auth_user(db: AsyncSession, id_token_str: str) -> dict:
+        """
+        Authenticate user via Google OAuth 2.0 ID Token.
+        Creates a new user if one doesn't exist, or logs in an existing user.
+        Returns app JWT access token and refresh token.
+        """
+        try:
+            # Verify Google ID token
+            id_info = await asyncio.to_thread(
+                google_id_token.verify_oauth2_token,
+                id_token_str,
+                google_requests.Request(),
+                settings.GOOGLE_CLIENT_ID
+            )
+
+            google_id = id_info.get("sub")
+            email = id_info.get("email", "").strip().lower()
+            name = id_info.get("name") or email.split("@")[0]
+            picture = id_info.get("picture")
+
+            if not email:
+                raise Exception("Email not provided by Google")
+
+            # Check if user exists by google_id or email
+            result = await db.execute(
+                select(User).filter(
+                    (User.google_id == google_id) | (User.user_email == email)
+                )
+            )
+            user = result.scalars().first()
+
+            if not user:
+                # Create new OAuth user
+                user = User(
+                    user_name=name,
+                    user_email=email,
+                    google_id=google_id,
+                    auth_provider="google",
+                    profile_picture=picture,
+                    password_hash=None
+                )
+                db.add(user)
+                await db.commit()
+                await db.refresh(user)
+                logger.info(f"Created new Google OAuth user user_id={user.user_id}")
+            else:
+                # Update existing user details if linking google account
+                if not user.google_id:
+                    user.google_id = google_id
+                if picture:
+                    user.profile_picture = picture
+                await db.commit()
+                logger.info(f"Google OAuth login for existing user user_id={user.user_id}")
+
+            # Delete existing refresh tokens (single session rule)
+            await db.execute(
+                delete(RefreshToken).filter(
+                    RefreshToken.user_id == user.user_id
+                )
+            )
+
+            # Generate app tokens
+            access_token = UserService.generate_access_token(user.user_id)
+            refresh_token, expires_at = UserService.generate_refresh_token(user.user_id)
+
+            token_entry = RefreshToken(
+                user_id=user.user_id,
+                refresh_token=refresh_token,
+                expires_at=expires_at
+            )
+
+            db.add(token_entry)
+            await db.commit()
+
+            return {
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "token_type": "bearer",
+                "user_id": user.user_id,
+                "user_name": user.user_name,
+                "user_email": user.user_email,
+                "profile_picture": user.profile_picture
+            }
+
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Google OAuth failed: {str(e)}")
+            raise Exception(f"Google authentication failed: {str(e)}")
