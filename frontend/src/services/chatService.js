@@ -1,4 +1,4 @@
-import api from "./api";
+import api, { getInMemoryToken } from "./api";
 
 /**
  * =====================================================
@@ -35,7 +35,7 @@ export const queryAssistant = async (userId, query) => {
  * Headers: 
  *   - Accept: text/event-stream
  *   - Content-Type: application/json
- *   - Authorization: Bearer <access_token> (manually read from localStorage)
+ *   - Authorization: Bearer <access_token> (retrieved from memory / sessionStorage)
  * Request Payload:
  * {
  *   "query": "user query content...",
@@ -44,18 +44,17 @@ export const queryAssistant = async (userId, query) => {
  */
 export const queryAssistantStream = async (userId, query, chatId, onChunk, onSources, onDone, onError, documentIds = null) => {
   try {
-    const user = localStorage.getItem("user")
-      ? JSON.parse(localStorage.getItem("user"))
-      : null;
+    const token = getInMemoryToken() || sessionStorage.getItem("access_token");
       
     const headers = {
       "Content-Type": "application/json",
       "Accept": "text/event-stream",
     };
 
-    if (user && user.token) {
-      headers["Authorization"] = `Bearer ${user.token}`;
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
     }
+
 
     const requestBody = {
       user_id: userId,

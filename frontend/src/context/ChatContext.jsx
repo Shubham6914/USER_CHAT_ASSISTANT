@@ -231,10 +231,10 @@ function ChatProvider({ children }) {
    * 4. Finalize response on complete (completeAssistantMessage) or error (failAssistantMessage)
    * 5. Generate summary title automatically if chat is in "New Chat" status
    */
-  const sendMessage = async (messageText) => {
-    if (!activeConversationId || isGenerating) return;
+  const sendMessage = async (messageText, overrideChatId = null) => {
+    const chat_id = overrideChatId || activeConversationId;
+    if (!chat_id || isGenerating) return;
 
-    const chat_id = activeConversationId;
     setIsGenerating(true);
 
     try {
@@ -349,6 +349,32 @@ function ChatProvider({ children }) {
     }
   };
 
+  /**
+   * Helper for Study & Research component: Creates a new chat session and dispatches prompt.
+   */
+  const startStudySession = async (promptText, customTitle = "YouTube Study Session") => {
+    try {
+      const data = await createChat(customTitle);
+      const newChatId = data.chat_id;
+      const newConversation = {
+        id: newChatId,
+        title: customTitle,
+        messages: [],
+        title_status: data.title_status,
+      };
+
+      loadedChatsRef.current.add(newChatId);
+
+      setConversations((prev) => [newConversation, ...prev]);
+      setActiveConversationId(newChatId);
+
+      // Trigger message streaming for the new chat session
+      await sendMessage(promptText, newChatId);
+    } catch (e) {
+      console.error("Failed to start study session:", e);
+    }
+  };
+
   const selectConversation = (conversationId) => {
     setActiveConversationId(conversationId);
   };
@@ -368,6 +394,7 @@ function ChatProvider({ children }) {
     deleteConversation,
     selectConversation,
     sendMessage,
+    startStudySession,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

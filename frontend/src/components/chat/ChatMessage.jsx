@@ -113,7 +113,6 @@ function ChatMessage({ role, content, sources }) {
       };
 
       // Helper to parse inline styles: **bold** and *italics*
-      // (Explicitly ignoring underscores like '_' and '__' to preserve raw python tokens)
       const parseInlineStyles = (lineText) => {
         if (!lineText) return "";
         
@@ -122,6 +121,16 @@ function ChatMessage({ role, content, sources }) {
           .replace(/&/g, "&amp;")
           .replace(/</g, "&lt;")
           .replace(/>/g, "&gt;");
+
+        // Restore <details> and <summary> tags for interactive quiz accordions
+        html = html
+          .replace(/&lt;details&gt;/gi, '<details class="my-3 p-3.5 rounded-2xl border border-slate-200/80 dark:border-zinc-800/80 bg-slate-50/80 dark:bg-zinc-900/60 text-slate-800 dark:text-zinc-200 transition-all">')
+          .replace(/&lt;\/details&gt;/gi, '</details>')
+          .replace(/&lt;summary&gt;/gi, '<summary class="font-semibold text-brand-600 dark:text-brand-400 cursor-pointer select-none py-1 hover:underline outline-none">')
+          .replace(/&lt;\/summary&gt;/gi, '</summary>');
+
+        // Timestamps [MM:SS] or [HH:MM:SS]
+        html = html.replace(/\[(\d{2}:\d{2}(:\d{2})?)\]/g, '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-brand-50 dark:bg-brand-950/50 text-brand-600 dark:text-brand-400 font-mono text-[12px] font-semibold border border-brand-200/50 dark:border-brand-800/40 select-none">⏱️ $1</span>');
 
         // Markdown Links: [text](url)
         html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-brand-600 dark:text-brand-400 hover:underline font-semibold">$1</a>');
@@ -140,6 +149,7 @@ function ChatMessage({ role, content, sources }) {
 
         return <span dangerouslySetInnerHTML={{ __html: html }} />;
       };
+
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -312,6 +322,8 @@ function ChatMessage({ role, content, sources }) {
                 const url = src.url || src.metadata?.url;
                 const title = src.title || src.metadata?.title;
                 
+                const isYouTube = url && (url.includes("youtube.com") || url.includes("youtu.be"));
+
                 const getHostname = (urlStr) => {
                   try {
                     return new URL(urlStr).hostname.replace("www.", "");
@@ -323,6 +335,10 @@ function ChatMessage({ role, content, sources }) {
                 let sourceLabel = `Source ${sIdx + 1}`;
                 if (pageNum) {
                   sourceLabel = `Page ${pageNum}`;
+                } else if (isYouTube) {
+                  sourceLabel = title
+                    ? `YouTube: ${title.length > 25 ? title.slice(0, 25) + "..." : title}`
+                    : "YouTube Video";
                 } else if (url) {
                   const domain = getHostname(url);
                   sourceLabel = title
@@ -339,22 +355,25 @@ function ChatMessage({ role, content, sources }) {
                   <Tag
                     key={sIdx}
                     {...tagProps}
-                    className="
-                      group/src relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl border
-                      bg-slate-100/50 dark:bg-zinc-900/40 border-slate-200/60 dark:border-zinc-800/80
-                      text-[11px] font-semibold text-slate-600 dark:text-zinc-400 hover:text-brand-600 dark:hover:text-brand-400
-                      hover:border-brand-500/40 dark:hover:border-brand-500/30 hover:bg-white dark:hover:bg-zinc-900
-                      transition-all duration-200 cursor-pointer shadow-sm no-underline
-                    "
+                    className={`
+                      group/src relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition-all duration-200 cursor-pointer shadow-sm no-underline
+                      ${isYouTube
+                        ? "bg-red-50/80 dark:bg-red-950/40 border-red-200/80 dark:border-red-900/50 text-red-700 dark:text-red-400 hover:bg-red-100/90 dark:hover:bg-red-900/60 hover:border-red-400/60"
+                        : "bg-slate-100/50 dark:bg-zinc-900/40 border-slate-200/60 dark:border-zinc-800/80 text-slate-600 dark:text-zinc-400 hover:text-brand-600 dark:hover:text-brand-400 hover:border-brand-500/40 dark:hover:border-brand-500/30 hover:bg-white dark:hover:bg-zinc-900"}
+                    `}
                   >
-                    {url ? (
-                      <svg className="w-3 h-3 text-slate-400 dark:text-zinc-500 group-hover/src:text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    {isYouTube ? (
+                      <svg className="w-3.5 h-3.5 text-red-600 dark:text-red-500 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                      </svg>
+                    ) : url ? (
+                      <svg className="w-3 h-3 text-slate-400 dark:text-zinc-500 group-hover/src:text-brand-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                       </svg>
                     ) : (
-                      <span className="w-1.5 h-1.5 rounded-full bg-brand-500/80 dark:bg-brand-500/70" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-brand-500/80 dark:bg-brand-500/70 shrink-0" />
                     )}
-                    <span>{sourceLabel}</span>
+                    <span className="truncate max-w-[220px]">{sourceLabel}</span>
                     
                     {/* Floating Hover Card (Perplexity-style) */}
                     <div 
@@ -369,10 +388,11 @@ function ChatMessage({ role, content, sources }) {
                       "
                     >
                       <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-slate-800 dark:border-zinc-850 text-[10px] text-zinc-400 uppercase font-bold tracking-wider">
-                        <span>{url ? "Web Source Snippet" : "Citation Content"}</span>
+                        <span>{isYouTube ? "YouTube Video Source" : url ? "Web Source Snippet" : "Citation Content"}</span>
                         {pageNum && <span className="text-brand-400">Page {pageNum}</span>}
-                        {url && <span className="text-brand-400">{getHostname(url)}</span>}
+                        {url && <span className={isYouTube ? "text-red-400" : "text-brand-400"}>{getHostname(url)}</span>}
                       </div>
+
                       <p className="text-[11px] leading-relaxed text-zinc-200 font-normal break-words whitespace-pre-line">
                         {textSnippet}
                       </p>
