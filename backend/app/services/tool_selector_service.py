@@ -80,8 +80,9 @@ class ToolSelectorService:
             parameters = tool_plan.get("parameters", {"query": query})
 
             # Allowed external tools only
-            allowed_tools = ["web_search", "calculator"]
+            allowed_tools = ["web_search", "calculator", "youtube_tool"]
             if selected_tool not in allowed_tools:
+
                 self.logger.warning(f"[ToolSelector] Unexpected tool '{selected_tool}' -> fallback to 'web_search'")
                 selected_tool = "web_search"
 

@@ -81,30 +81,46 @@ class OrchestrationService:
                     output = event.get("data", {}).get("output", {})
                     if output and isinstance(output, dict):
                         tool_res = output.get("tool_response", {})
-                        results = None
                         
                         if isinstance(tool_res, dict):
                             data = tool_res.get("data", {})
-                            if isinstance(data, dict):
-                                res_obj = data.get("results")
-                                if isinstance(res_obj, dict):
-                                    results = res_obj.get("results")
-                                elif isinstance(res_obj, list):
-                                    results = res_obj
-                            if not results:
-                                results = tool_res.get("results")
-                        
-                        if results and isinstance(results, list):
-                            sources_data = []
-                            for res in results:
-                                if isinstance(res, dict):
-                                    sources_data.append({
-                                        "url": res.get("url"),
-                                        "title": res.get("title"),
-                                        "content": res.get("content", "")[:400]
-                                    })
-                            if sources_data:
-                                yield "data: " + json.dumps({"type": "sources", "sources": sources_data}) + "\n\n"
+                            
+                            # Case A: YouTube Tool Result
+                            if isinstance(data, dict) and "video_id" in data:
+                                video_id = data.get("video_id")
+                                title = data.get("title", "YouTube Video")
+                                author = data.get("author", "Creator")
+                                yt_sources = [{
+                                    "url": f"https://www.youtube.com/watch?v={video_id}",
+                                    "title": title,
+                                    "content": f"Channel: {author}"
+                                }]
+                                yield "data: " + json.dumps({"type": "sources", "sources": yt_sources}) + "\n\n"
+
+                            # Case B: Web Search (Tavily) Result
+                            else:
+                                results = None
+                                if isinstance(data, dict):
+                                    res_obj = data.get("results")
+                                    if isinstance(res_obj, dict):
+                                        results = res_obj.get("results")
+                                    elif isinstance(res_obj, list):
+                                        results = res_obj
+                                if not results:
+                                    results = tool_res.get("results")
+                                
+                                if results and isinstance(results, list):
+                                    sources_data = []
+                                    for res in results:
+                                        if isinstance(res, dict):
+                                            sources_data.append({
+                                                "url": res.get("url"),
+                                                "title": res.get("title"),
+                                                "content": res.get("content", "")[:400]
+                                            })
+                                    if sources_data:
+                                        yield "data: " + json.dumps({"type": "sources", "sources": sources_data}) + "\n\n"
+
 
                 # 3. Capture streaming tokens from ChatOpenAI execution
                 elif kind == "on_chat_model_stream":

@@ -1,7 +1,8 @@
 from typing import Dict, Callable, Any
 from app.services.logger_service import get_logger
 from app.services.retrieval_service import RetrievalService  
-from app.services.prompt_service import LLM_INSTRUCTIONS
+from app.services.prompt_service import LLM_INSTRUCTIONS, MASTER_TEACHER_YOUTUBE_PROMPT
+from app.services.youtube_service import YouTubeService
 from app.core.llm_client import llm_client
 from langchain_tavily import TavilySearch
 
@@ -22,7 +23,7 @@ class ToolService:
     """
 
     def __init__(self, retrieval_service:RetrievalService):
-        """:
+        """
         Initialize ToolService
 
         Args:
@@ -35,6 +36,7 @@ class ToolService:
             max_results=3,
             topic="general"
         )
+        self.youtube_service = YouTubeService()
 
         # Tool registry
         self.tools: Dict[str, Callable] = {}
@@ -54,8 +56,10 @@ class ToolService:
 
         self.tools["web_search"] = self._web_search_tool
         self.tools["calculator"] = self._calculator_tool
+        self.tools["youtube_tool"] = self._youtube_tool
 
         self.logger.info(f"[ToolService] Registered external tools: {list(self.tools.keys())}")
+
 
     # ------------------------------------------------------------------
     # MAIN EXECUTION
@@ -196,4 +200,40 @@ class ToolService:
         except Exception as e:
             self.logger.error(f"[Tool:calculator] Failed: {str(e)}")
             raise
+
+    # ------------------------------------------------------------------
+    # TOOL 3: YOUTUBE MASTER TEACHER TOOL
+    # ------------------------------------------------------------------
+
+    async def _youtube_tool(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Fetch YouTube video transcript & metadata.
+
+        Input:
+            {
+                "url": "https://www.youtube.com/watch?v=..."
+            }
+        """
+        self.logger.debug(f"[Tool:youtube_tool] Params: {params}")
+
+        url = params.get("url") or params.get("query") or params.get("url_or_id")
+        if not url:
+            raise ValueError("Missing 'url' parameter for YouTube tool")
+
+        try:
+            # Fetch transcript + metadata
+            study_data = await self.youtube_service.get_study_content(url)
+
+            return {
+                "title": study_data.get("title", "YouTube Video"),
+                "author": study_data.get("author", "Creator"),
+                "video_id": study_data.get("video_id"),
+                "transcript": study_data.get("transcript", "")
+            }
+
+        except Exception as e:
+            self.logger.error(f"[Tool:youtube_tool] Failed: {str(e)}")
+            raise
+
+
 

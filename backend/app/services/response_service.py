@@ -1,6 +1,8 @@
 from typing import Optional, Dict, Any
 from app.services.logger_service import get_logger
 from app.core.llm_client import llm_client
+from app.services.prompt_service import MASTER_TEACHER_YOUTUBE_PROMPT
+
 
 
 class ResponseService:
@@ -281,6 +283,42 @@ class ResponseService:
     ):
         try:
             self.logger.info(f"[Response] Generating tool response async for {tool_name}")
+
+            # For youtube_tool, stream the Master Teacher notes live via LLM model stream
+            if tool_name == "youtube_tool":
+                title = "YouTube Video"
+                author = "Creator"
+                transcript = ""
+
+                if isinstance(tool_result, dict):
+                    data = tool_result.get("data", {})
+                    if isinstance(data, dict):
+                        title = data.get("title", title)
+                        author = data.get("author", author)
+                        transcript = data.get("transcript", "")
+                    else:
+                        title = tool_result.get("title", title)
+                        author = tool_result.get("author", author)
+                        transcript = tool_result.get("transcript", "")
+
+                prompt = MASTER_TEACHER_YOUTUBE_PROMPT.format(
+                    title=title,
+                    author=author,
+                    transcript=transcript
+                )
+
+                messages = [
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ]
+
+                async for chunk in self._astream_llm(messages):
+                    yield chunk
+                return
+
+
             formatted_result = self._format_tool_result_for_prompt(tool_name, tool_result)
             
             prompt = f"""
@@ -321,4 +359,5 @@ class ResponseService:
                 yield chunk
         except Exception as e:
             self.logger.error(f"[Response] Tool response async failed: {str(e)}")
-            raise
+            raise
+
